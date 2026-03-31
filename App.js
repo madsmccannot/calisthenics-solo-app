@@ -1,20 +1,19 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import SetupScreen from './src/screens/SetupScreen';
+import { generateWorkoutPlan } from './src/services/geminiService';
 
 export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
-}
+  const [profile, setProfile] = useState(null);
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+  const handleSetupComplete = async (userProfile) => {
+    setProfile(userProfile);
+    const plan = await generateWorkoutPlan(userProfile, 1);
+    console.log('PLANO GERADO:', JSON.stringify(plan, null, 2));
+  };
+
+  if (!profile) {
+    return <SetupScreen onSetupComplete={handleSetupComplete} />;
+  }
+
+  return null;
+}
