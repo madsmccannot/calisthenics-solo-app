@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator
+  ScrollView, ActivityIndicator, Alert
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateWorkoutPlan } from '../services/geminiService';
 import { getStreakData } from '../services/localStore';
 
-export default function Dashboard({ profile, onStartWorkout }) {
+export default function Dashboard({ profile, onStartWorkout, onReset }) {
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState({ current: 0, best: 0 });
@@ -60,6 +60,28 @@ export default function Dashboard({ profile, onStartWorkout }) {
     await AsyncStorage.setItem('workoutPlan', JSON.stringify(plan));
     setDays(plan);
     setLoading(false);
+  };
+
+  const handleReset = () => {
+    Alert.alert(
+      'Resetar tudo?',
+      'Isto apaga o teu plano, progresso e streak. Tens a certeza?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Resetar',
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.removeItem('workoutPlan');
+            await AsyncStorage.removeItem('streakData');
+            await AsyncStorage.removeItem('userProfile');
+            setDays([]);
+            setStreak({ current: 0, best: 0 });
+            onReset();
+          },
+        },
+      ]
+    );
   };
 
   const getCardStyle = (day) => {
@@ -116,6 +138,9 @@ export default function Dashboard({ profile, onStartWorkout }) {
           </TouchableOpacity>
         ))}
       </View>
+      <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
+        <Text style={styles.resetBtnText}>⚠ Resetar Tudo</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -152,4 +177,10 @@ const styles = StyleSheet.create({
   streakFire: { fontSize: 36 },
   streakCurrent: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
   streakBest: { color: '#aaaaaa', fontSize: 13, marginTop: 2 },
+  resetBtn: {
+    marginTop: 12, marginBottom: 80, padding: 14,
+    borderRadius: 12, borderWidth: 1, borderColor: '#ef4444',
+    alignItems: 'center'
+  },
+  resetBtnText: { color: '#ef4444', fontSize: 15 },
 });

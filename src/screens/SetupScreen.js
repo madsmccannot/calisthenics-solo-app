@@ -4,7 +4,6 @@ import {
   StyleSheet, ScrollView, Alert
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { scheduleDailyReminder } from '../services/notificationService';
 
 const LEVELS = ['Iniciante', 'Intermédio', 'Avançado'];
 
@@ -21,7 +20,6 @@ export default function SetupScreen({ onSetupComplete }) {
 
     const profile = { weight, height, level };
     await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
-    await scheduleDailyReminder(9, 0); // Notificação todos os dias às 9:00
     onSetupComplete(profile);
   };
 

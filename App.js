@@ -26,6 +26,12 @@ export default function App() {
     setDashboardKey((k) => k + 1);
   };
 
+  const handleReset = () => {
+    setProfile(null);
+    setCurrentWorkout(null);
+    setDashboardKey(0);
+  };
+
   if (!profile) {
     return <SetupScreen onSetupComplete={setProfile} />;
   }
@@ -45,6 +51,7 @@ export default function App() {
       key={dashboardKey}
       profile={profile}
       onStartWorkout={(workout) => setCurrentWorkout(workout)}
+      onReset={handleReset}
     />
   );
 }
