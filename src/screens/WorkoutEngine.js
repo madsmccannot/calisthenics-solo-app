@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, Animated
 } from 'react-native';
+import { playBeep } from '../services/soundService';
 
 export default function WorkoutEngine({ workout, onComplete, onBack }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -53,6 +54,7 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
           clearInterval(intervalRef.current);
           setIsRunning(false);
           if (phase === 'rest') {
+            playBeep();
             goToNext();
           }
           return 0;
@@ -68,6 +70,7 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
       return;
     }
     if (current.rest_seconds > 0) {
+      playBeep();
       setPhase('rest');
     } else {
       goToNext();
