@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import SetupScreen from './src/screens/SetupScreen';
 import Dashboard from './src/screens/Dashboard';
 import WorkoutEngine from './src/screens/WorkoutEngine';
+import CompletionScreen from './src/screens/CompletionScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { updateStreak } from './src/services/localStore';
+import { updateStreak, getStreakData } from './src/services/localStore';
 
 export default function App() {
   const [profile, setProfile] = useState(null);
   const [currentWorkout, setCurrentWorkout] = useState(null);
+  const [completedWorkout, setCompletedWorkout] = useState(null);
+  const [currentStreak, setCurrentStreak] = useState(0);
   const [dashboardKey, setDashboardKey] = useState(0);
 
   const handleWorkoutComplete = async () => {
@@ -21,14 +24,16 @@ export default function App() {
       );
       await AsyncStorage.setItem('workoutPlan', JSON.stringify(updated));
     }
-    await updateStreak();
+    const streakData = await updateStreak();
+    setCurrentStreak(streakData.current);
+    setCompletedWorkout(currentWorkout);
     setCurrentWorkout(null);
-    setDashboardKey((k) => k + 1);
   };
 
   const handleReset = () => {
     setProfile(null);
     setCurrentWorkout(null);
+    setCompletedWorkout(null);
     setDashboardKey(0);
   };
 
@@ -42,6 +47,19 @@ export default function App() {
         workout={currentWorkout}
         onComplete={handleWorkoutComplete}
         onBack={() => setCurrentWorkout(null)}
+      />
+    );
+  }
+
+  if (completedWorkout) {
+    return (
+      <CompletionScreen
+        workout={completedWorkout}
+        streak={currentStreak}
+        onBack={() => {
+          setCompletedWorkout(null);
+          setDashboardKey((k) => k + 1);
+        }}
       />
     );
   }
