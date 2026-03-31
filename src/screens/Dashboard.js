@@ -5,14 +5,22 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateWorkoutPlan } from '../services/geminiService';
+import { getStreakData } from '../services/localStore';
 
 export default function Dashboard({ profile, onStartWorkout }) {
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [streak, setStreak] = useState({ current: 0, best: 0 });
 
   useEffect(() => {
     loadOrGeneratePlan();
+    loadStreak();
   }, []);
+
+  const loadStreak = async () => {
+    const data = await getStreakData();
+    setStreak(data);
+  };
 
   const loadOrGeneratePlan = async () => {
     try {
@@ -34,7 +42,6 @@ export default function Dashboard({ profile, onStartWorkout }) {
     const plan = [];
 
     for (let i = 1; i <= 30; i++) {
-      // Dias de recuperação a cada 7 dias
       if (i % 7 === 0) {
         plan.push({
           day_number: i,
@@ -81,6 +88,13 @@ export default function Dashboard({ profile, onStartWorkout }) {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>O teu Plano de 30 Dias</Text>
+      <View style={styles.streakBanner}>
+        <Text style={styles.streakFire}>🔥</Text>
+        <View>
+          <Text style={styles.streakCurrent}>{streak.current} dias seguidos</Text>
+          <Text style={styles.streakBest}>Melhor: {streak.best} dias</Text>
+        </View>
+      </View>
       <View style={styles.grid}>
         {days.map((day) => (
           <TouchableOpacity
@@ -121,7 +135,21 @@ const styles = StyleSheet.create({
   dayType: { fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
   checkmark: { fontSize: 18, color: '#4ade80', marginTop: 2 },
   exerciseCount: { fontSize: 10, color: '#666', marginTop: 2 },
-  loadingContainer: { flex: 1, backgroundColor: '#0f0f0f', justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold', marginTop: 20, textAlign: 'center' },
+  loadingContainer: {
+    flex: 1, backgroundColor: '#0f0f0f',
+    justifyContent: 'center', alignItems: 'center'
+  },
+  loadingText: {
+    color: '#ffffff', fontSize: 18, fontWeight: 'bold',
+    marginTop: 20, textAlign: 'center'
+  },
   loadingSubtext: { color: '#aaaaaa', fontSize: 14, marginTop: 8, textAlign: 'center' },
+  streakBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    backgroundColor: '#1e1e1e', borderRadius: 14, padding: 16,
+    marginBottom: 20, borderWidth: 1, borderColor: '#f97316'
+  },
+  streakFire: { fontSize: 36 },
+  streakCurrent: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
+  streakBest: { color: '#aaaaaa', fontSize: 13, marginTop: 2 },
 });

@@ -3,13 +3,14 @@ import SetupScreen from './src/screens/SetupScreen';
 import Dashboard from './src/screens/Dashboard';
 import WorkoutEngine from './src/screens/WorkoutEngine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateStreak } from './src/services/localStore';
 
 export default function App() {
   const [profile, setProfile] = useState(null);
   const [currentWorkout, setCurrentWorkout] = useState(null);
+  const [dashboardKey, setDashboardKey] = useState(0);
 
   const handleWorkoutComplete = async () => {
-    // Marca o dia como completo no plano guardado
     const saved = await AsyncStorage.getItem('workoutPlan');
     if (saved) {
       const plan = JSON.parse(saved);
@@ -20,7 +21,9 @@ export default function App() {
       );
       await AsyncStorage.setItem('workoutPlan', JSON.stringify(updated));
     }
+    await updateStreak();
     setCurrentWorkout(null);
+    setDashboardKey((k) => k + 1);
   };
 
   if (!profile) {
@@ -39,6 +42,7 @@ export default function App() {
 
   return (
     <Dashboard
+      key={dashboardKey}
       profile={profile}
       onStartWorkout={(workout) => setCurrentWorkout(workout)}
     />
