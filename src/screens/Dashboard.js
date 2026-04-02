@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert
+  ScrollView, ActivityIndicator
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateWorkoutPlan } from '../services/geminiService';
-import { getStreakData } from '../services/localStore';
+import { getStreakData, updateStreak } from '../services/localStore';
+import RecoveryModal from '../components/RecoveryModal';
 
-export default function Dashboard({ profile, onStartWorkout, onReset }) {
+export default function Dashboard({ profile, onStartWorkout }) {
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState({ current: 0, best: 0 });
+  const [recoveryDay, setRecoveryDay] = useState(null);
 
   useEffect(() => {
     loadOrGeneratePlan();
@@ -40,7 +42,6 @@ export default function Dashboard({ profile, onStartWorkout, onReset }) {
   const generateFullPlan = async () => {
     setLoading(true);
     const plan = [];
-
     for (let i = 1; i <= 30; i++) {
       if (i % 7 === 0) {
         plan.push({
@@ -56,32 +57,25 @@ export default function Dashboard({ profile, onStartWorkout, onReset }) {
         }
       }
     }
-
     await AsyncStorage.setItem('workoutPlan', JSON.stringify(plan));
     setDays(plan);
     setLoading(false);
   };
 
-  const handleReset = () => {
-    Alert.alert(
-      'Resetar tudo?',
-      'Isto apaga o teu plano, progresso e streak. Tens a certeza?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Resetar',
-          style: 'destructive',
-          onPress: async () => {
-            await AsyncStorage.removeItem('workoutPlan');
-            await AsyncStorage.removeItem('streakData');
-            await AsyncStorage.removeItem('userProfile');
-            setDays([]);
-            setStreak({ current: 0, best: 0 });
-            onReset();
-          },
-        },
-      ]
-    );
+  const handleRecoveryDone = async () => {
+    if (!recoveryDay) return;
+    const saved = await AsyncStorage.getItem('workoutPlan');
+    if (saved) {
+      const plan = JSON.parse(saved);
+      const updated = plan.map((d) =>
+        d.day_number === recoveryDay.day_number ? { ...d, completed: true } : d
+      );
+      await AsyncStorage.setItem('workoutPlan', JSON.stringify(updated));
+      setDays(updated);
+    }
+    const streakData = await updateStreak();
+    setStreak(streakData);
+    setRecoveryDay(null);
   };
 
   const getCardStyle = (day) => {
@@ -108,40 +102,49 @@ export default function Dashboard({ profile, onStartWorkout, onReset }) {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>O teu Plano de 30 Dias</Text>
-      <View style={styles.streakBanner}>
-        <Text style={styles.streakFire}>🔥</Text>
-        <View>
-          <Text style={styles.streakCurrent}>{streak.current} dias seguidos</Text>
-          <Text style={styles.streakBest}>Melhor: {streak.best} dias</Text>
+    <>
+      <ScrollView style={styles.container}>
+        <Text style={styles.title}>O teu Plano de 30 Dias</Text>
+        <View style={styles.streakBanner}>
+          <Text style={styles.streakFire}>🔥</Text>
+          <View>
+            <Text style={styles.streakCurrent}>{streak.current} dias seguidos</Text>
+            <Text style={styles.streakBest}>Melhor: {streak.best} dias</Text>
+          </View>
         </View>
-      </View>
-      <View style={styles.grid}>
-        {days.map((day) => (
-          <TouchableOpacity
-            key={day.day_number}
-            style={getCardStyle(day)}
-            onPress={() => day.workout_type !== 'Recovery' && onStartWorkout(day)}
-            disabled={day.workout_type === 'Recovery'}
-          >
-            <Text style={styles.dayNumber}>Dia {day.day_number}</Text>
-            <Text style={[styles.dayType, { color: getTypeColor(day.workout_type) }]}>
-              {day.workout_type}
-            </Text>
-            {day.completed && <Text style={styles.checkmark}>✓</Text>}
-            {day.workout_type !== 'Recovery' && (
-              <Text style={styles.exerciseCount}>
-                {day.exercises?.length || 0} exercícios
+        <View style={styles.grid}>
+          {days.map((day) => (
+            <TouchableOpacity
+              key={day.day_number}
+              style={getCardStyle(day)}
+              onPress={() => {
+                if (day.workout_type === 'Recovery') {
+                  setRecoveryDay(day);
+                  return;
+                }
+                onStartWorkout(day);
+              }}
+            >
+              <Text style={styles.dayNumber}>Dia {day.day_number}</Text>
+              <Text style={[styles.dayType, { color: getTypeColor(day.workout_type) }]}>
+                {day.workout_type}
               </Text>
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
-      <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-        <Text style={styles.resetBtnText}>⚠ Resetar Tudo</Text>
-      </TouchableOpacity>
-    </ScrollView>
+              {day.completed && <Text style={styles.checkmark}>✓</Text>}
+              {day.workout_type !== 'Recovery' && (
+                <Text style={styles.exerciseCount}>
+                  {day.exercises?.length || 0} exercícios
+                </Text>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+      <RecoveryModal
+        visible={!!recoveryDay}
+        onDismiss={() => setRecoveryDay(null)}
+        onComplete={handleRecoveryDone}
+      />
+    </>
   );
 }
 
@@ -177,10 +180,4 @@ const styles = StyleSheet.create({
   streakFire: { fontSize: 36 },
   streakCurrent: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
   streakBest: { color: '#aaaaaa', fontSize: 13, marginTop: 2 },
-  resetBtn: {
-    marginTop: 12, marginBottom: 80, padding: 14,
-    borderRadius: 12, borderWidth: 1, borderColor: '#ef4444',
-    alignItems: 'center'
-  },
-  resetBtnText: { color: '#ef4444', fontSize: 15 },
 });
