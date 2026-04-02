@@ -4,14 +4,16 @@ import {
   ScrollView, Animated
 } from 'react-native';
 import { playBeep } from '../services/soundService';
+import AnimationPlayer from '../components/AnimationPlayer';
 
 export default function WorkoutEngine({ workout, onComplete, onBack }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [phase, setPhase] = useState('exercise'); // 'exercise' | 'rest'
+  const [phase, setPhase] = useState('exercise');
   const [timeLeft, setTimeLeft] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const intervalRef = useRef(null);
   const progressAnim = useRef(new Animated.Value(1)).current;
+  const currentIndexRef = useRef(0);
 
   const exercises = workout.exercises;
   const current = exercises[currentIndex];
@@ -19,12 +21,16 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
   const isTimeBased = current?.type !== 'reps';
 
   useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  useEffect(() => {
     return () => clearInterval(intervalRef.current);
   }, []);
 
   useEffect(() => {
     if (phase === 'rest') {
-      startTimer(current.rest_seconds);
+      startTimer(current.rest_seconds, true);
     } else {
       setIsRunning(false);
       clearInterval(intervalRef.current);
@@ -36,7 +42,20 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
     }
   }, [phase, currentIndex]);
 
-  const startTimer = (seconds) => {
+  const goToNext = () => {
+    const idx = currentIndexRef.current;
+    const last = idx === exercises.length - 1;
+    if (last) {
+      playBeep();
+      setTimeout(() => playBeep(), 400);
+      onComplete();
+    } else {
+      setCurrentIndex(idx + 1);
+      setPhase('exercise');
+    }
+  };
+
+  const startTimer = (seconds, isRestPhase = false) => {
     clearInterval(intervalRef.current);
     setTimeLeft(seconds);
     setIsRunning(true);
@@ -53,9 +72,16 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
         if (prev <= 1) {
           clearInterval(intervalRef.current);
           setIsRunning(false);
-          if (phase === 'rest') {
-            playBeep();
+          playBeep();
+          if (isRestPhase) {
             goToNext();
+          } else {
+            const cur = exercises[currentIndexRef.current];
+            if (cur.rest_seconds > 0) {
+              setPhase('rest');
+            } else {
+              goToNext();
+            }
           }
           return 0;
         }
@@ -65,24 +91,26 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
   };
 
   const handleExerciseDone = () => {
-    if (isTimeBased && !isRunning) {
-      startTimer(current.quantity);
+    if (isTimeBased) {
+      if (!isRunning) {
+        startTimer(current.quantity, false);
+      } else {
+        clearInterval(intervalRef.current);
+        setIsRunning(false);
+        playBeep();
+        if (current.rest_seconds > 0) {
+          setPhase('rest');
+        } else {
+          goToNext();
+        }
+      }
       return;
     }
+    playBeep();
     if (current.rest_seconds > 0) {
-      playBeep();
       setPhase('rest');
     } else {
       goToNext();
-    }
-  };
-
-  const goToNext = () => {
-    if (isLast) {
-      onComplete();
-    } else {
-      setCurrentIndex((i) => i + 1);
-      setPhase('exercise');
     }
   };
 
@@ -99,9 +127,16 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
 
   if (!current) return null;
 
+  const getButtonLabel = () => {
+    if (isTimeBased) {
+      if (isRunning) return '⏭ Saltar';
+      return isLast ? '🏁 Terminar Treino' : '▶ Iniciar';
+    }
+    return isLast ? '🏁 Terminar Treino' : '✓ Feito';
+  };
+
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
           <Text style={styles.backBtn}>← Sair</Text>
@@ -111,22 +146,19 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
         </Text>
       </View>
 
-      {/* Barra de progresso geral */}
       <View style={styles.overallBar}>
         <View style={[styles.overallFill, {
-          width: `${((currentIndex) / exercises.length) * 100}%`
+          width: `${(currentIndex / exercises.length) * 100}%`
         }]} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         {phase === 'exercise' ? (
           <>
-            {/* Card do exercício */}
             <View style={styles.exerciseCard}>
               <Text style={styles.workoutType}>{workout.workout_type}</Text>
+              <AnimationPlayer animationFile={current.animation_file} />
               <Text style={styles.exerciseName}>{current.display_name}</Text>
-
-              {/* Quantidade */}
               <View style={styles.quantityBox}>
                 {current.type === 'reps' ? (
                   <>
@@ -142,8 +174,6 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
                   </>
                 )}
               </View>
-
-              {/* Timer bar para exercícios de tempo */}
               {isTimeBased && isRunning && (
                 <View style={styles.timerBarContainer}>
                   <Animated.View style={[styles.timerBarFill, { width: progressWidth }]} />
@@ -151,7 +181,6 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
               )}
             </View>
 
-            {/* Lista restante */}
             <Text style={styles.upNextLabel}>A seguir</Text>
             {exercises.slice(currentIndex + 1, currentIndex + 4).map((ex, i) => (
               <View key={i} style={styles.upNextItem}>
@@ -164,15 +193,10 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
             ))}
 
             <TouchableOpacity style={styles.doneBtn} onPress={handleExerciseDone}>
-              <Text style={styles.doneBtnText}>
-                {current.type === 'reps'
-                  ? isLast ? '🏁 Terminar Treino' : '✓ Feito'
-                  : isRunning ? '⏭ Saltar' : '▶ Iniciar'}
-              </Text>
+              <Text style={styles.doneBtnText}>{getButtonLabel()}</Text>
             </TouchableOpacity>
           </>
         ) : (
-          /* Ecrã de descanso */
           <View style={styles.restContainer}>
             <Text style={styles.restTitle}>Descansa</Text>
             <Text style={styles.restTimer}>{timeLeft}s</Text>
