@@ -116,12 +116,16 @@ export default function App() {
   }
 
   if (!profile) {
-    return <FadeScreen key="setup"><SetupScreen onSetupComplete={setProfile} /></FadeScreen>;
+    return (
+      <FadeScreen>
+        <SetupScreen onSetupComplete={setProfile} />
+      </FadeScreen>
+    );
   }
 
   if (currentWorkout) {
     return (
-      <FadeScreen key="workout">
+      <FadeScreen>
         <WorkoutEngine
           workout={currentWorkout}
           onComplete={handleWorkoutComplete}
@@ -133,7 +137,7 @@ export default function App() {
 
   if (completedWorkout) {
     return (
-      <FadeScreen key="completion">
+      <FadeScreen>
         <CompletionScreen
           workout={completedWorkout}
           streak={currentStreak}
@@ -147,30 +151,23 @@ export default function App() {
     );
   }
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case 'stats':
-        return <StatsScreen key="stats" profile={profile} />;
-      case 'profile':
-        return <ProfileScreen key="profile" profile={profile} onProfileUpdate={setProfile} onReset={handleReset} />;
-      default:
-        return (
-          <Dashboard
-            key={dashboardKey}
-            profile={profile}
-            onStartWorkout={(workout) => setCurrentWorkout(workout)}
-            onReset={handleReset}
-          />
-        );
-    }
-  };
-
   return (
-    <FadeScreen key={activeTab}>
-      <View style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
-        {renderTab()}
-        <BottomNav activeTab={activeTab} onTabPress={setActiveTab} />
+    <View style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
+      <View style={{ flex: 1, display: activeTab === 'dashboard' ? 'flex' : 'none' }}>
+        <Dashboard
+          key={dashboardKey}
+          profile={profile}
+          onStartWorkout={(workout) => setCurrentWorkout(workout)}
+          onReset={handleReset}
+        />
       </View>
-    </FadeScreen>
+      <View style={{ flex: 1, display: activeTab === 'stats' ? 'flex' : 'none' }}>
+        <StatsScreen profile={profile} />
+      </View>
+      <View style={{ flex: 1, display: activeTab === 'profile' ? 'flex' : 'none' }}>
+        <ProfileScreen profile={profile} onProfileUpdate={setProfile} onReset={handleReset} />
+      </View>
+      <BottomNav activeTab={activeTab} onTabPress={setActiveTab} />
+    </View>
   );
 }
