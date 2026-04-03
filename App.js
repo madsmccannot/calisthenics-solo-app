@@ -9,6 +9,7 @@ import SplashScreen from './src/screens/SplashScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import { updateStreak } from './src/services/localStore';
+import { BackHandler } from 'react-native';
 
 function FadeScreen({ children }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -78,6 +79,19 @@ export default function App() {
     loadProfile();
   }, []);
 
+  useEffect(() => {
+    const backAction = () => {
+      if (activeTab !== 'dashboard') {
+        setActiveTab('dashboard');
+        return true; // intercepta o botão
+      }
+      return false; // deixa sair da app
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [activeTab]);
+
   const loadProfile = async () => {
     const saved = await AsyncStorage.getItem('userProfile');
     if (saved) setProfile(JSON.parse(saved));
@@ -125,29 +139,25 @@ export default function App() {
 
   if (currentWorkout) {
     return (
-      <FadeScreen>
-        <WorkoutEngine
-          workout={currentWorkout}
-          onComplete={handleWorkoutComplete}
-          onBack={() => setCurrentWorkout(null)}
-        />
-      </FadeScreen>
+      <WorkoutEngine
+        workout={currentWorkout}
+        onComplete={handleWorkoutComplete}
+        onBack={() => setCurrentWorkout(null)}
+      />
     );
   }
 
   if (completedWorkout) {
     return (
-      <FadeScreen>
-        <CompletionScreen
-          workout={completedWorkout}
-          streak={currentStreak}
-          onBack={() => {
-            setCompletedWorkout(null);
-            setDashboardKey((k) => k + 1);
-            setActiveTab('dashboard');
-          }}
-        />
-      </FadeScreen>
+      <CompletionScreen
+        workout={completedWorkout}
+        streak={currentStreak}
+        onBack={() => {
+          setCompletedWorkout(null);
+          setDashboardKey((k) => k + 1);
+          setActiveTab('dashboard');
+        }}
+      />
     );
   }
 

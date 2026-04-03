@@ -8,24 +8,11 @@ import { generateWorkoutPlan } from '../services/geminiService';
 import { getStreakData, updateStreak } from '../services/localStore';
 import RecoveryModal from '../components/RecoveryModal';
 
-const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-
-function getMonday(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = (day === 0 ? -6 : 1 - day);
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 export default function Dashboard({ profile, onStartWorkout }) {
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState({ current: 0, best: 0 });
   const [recoveryDay, setRecoveryDay] = useState(null);
-  const [startDate, setStartDate] = useState(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
     loadAll();
@@ -40,10 +27,6 @@ export default function Dashboard({ profile, onStartWorkout }) {
       start = new Date().toISOString();
       await AsyncStorage.setItem('planStartDate', start);
     }
-    const startD = new Date(start);
-    startD.setHours(0, 0, 0, 0);
-    setStartDate(startD);
-    setCurrentMonth(new Date(startD.getFullYear(), startD.getMonth(), 1));
 
     const saved = await AsyncStorage.getItem('workoutPlan');
     if (saved) {
@@ -51,6 +34,9 @@ export default function Dashboard({ profile, onStartWorkout }) {
       setLoading(false);
       return;
     }
+
+    const startD = new Date(start);
+    startD.setHours(0, 0, 0, 0);
     await generateFullPlan(startD);
   };
 
@@ -96,14 +82,23 @@ export default function Dashboard({ profile, onStartWorkout }) {
     setRecoveryDay(null);
   };
 
-  const getDayForDate = (date) => {
-    return days.find((d) => {
-      if (!d.date) return false;
-      const dd = new Date(d.date);
-      return dd.getFullYear() === date.getFullYear() &&
-        dd.getMonth() === date.getMonth() &&
-        dd.getDate() === date.getDate();
-    });
+  const getCardStyle = (day) => {
+    if (day.completed) return [styles.card, styles.cardCompleted];
+    if (day.workout_type === 'Recovery') return [styles.card, styles.cardRecovery];
+
+    // Dia passado não completo
+    if (day.date) {
+      const d = new Date(day.date);
+      d.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (d < today) return [styles.card, styles.cardMissed];
+
+      // Hoje
+      if (d.getTime() === today.getTime()) return [styles.card, styles.cardToday];
+    }
+
+    return [styles.card];
   };
 
   const getTypeColor = (type) => {
@@ -113,88 +108,11 @@ export default function Dashboard({ profile, onStartWorkout }) {
     return '#aaaaaa';
   };
 
-  const renderCalendar = () => {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-
-    // Offset para começar na segunda-feira
-    let startOffset = firstDay.getDay() - 1;
-    if (startOffset < 0) startOffset = 6;
-
-    const cells = [];
-    for (let i = 0; i < startOffset; i++) cells.push(null);
-    for (let d = 1; d <= lastDay.getDate(); d++) {
-      cells.push(new Date(year, month, d));
-    }
-    while (cells.length % 7 !== 0) cells.push(null);
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return (
-      <View style={styles.calendarGrid}>
-        {WEEK_DAYS.map((wd) => (
-          <Text key={wd} style={styles.weekDay}>{wd}</Text>
-        ))}
-        {cells.map((date, i) => {
-          if (!date) return <View key={`empty-${i}`} style={styles.emptyCell} />;
-
-          const planDay = getDayForDate(date);
-          const isToday = date.getTime() === today.getTime();
-          const isPast = date < today && !isToday;
-          const isFuture = date > today;
-
-          let bgColor = '#1e1e1e';
-          let borderColor = '#333';
-          let textColor = '#ffffff';
-
-          if (planDay?.completed) {
-            bgColor = '#14532d';
-            borderColor = '#4ade80';
-          } else if (planDay && isToday) {
-            borderColor = '#f97316';
-          } else if (planDay && isPast && !planDay.completed) {
-            bgColor = '#2a1a1a';
-            borderColor = '#7f1d1d';
-          } else if (!planDay || isFuture) {
-            textColor = '#555';
-          }
-
-          return (
-            <TouchableOpacity
-              key={i}
-              style={[styles.cell, { backgroundColor: bgColor, borderColor }]}
-              onPress={() => {
-                if (!planDay) return;
-                if (planDay.workout_type === 'Recovery') {
-                  setRecoveryDay(planDay);
-                  return;
-                }
-                onStartWorkout(planDay);
-              }}
-              disabled={!planDay}
-            >
-              <Text style={[styles.cellDate, { color: isToday ? '#f97316' : textColor }]}>
-                {date.getDate()}
-              </Text>
-              {planDay && (
-                <>
-                  <Text style={[styles.cellPlanDay, { color: getTypeColor(planDay.workout_type) }]}>
-                    D{planDay.day_number}
-                  </Text>
-                  {planDay.completed && <Text style={styles.cellCheck}>✓</Text>}
-                </>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    );
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
   };
-
-  const monthName = currentMonth.toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
 
   if (loading) {
     return (
@@ -209,7 +127,7 @@ export default function Dashboard({ profile, onStartWorkout }) {
   return (
     <>
       <ScrollView style={styles.container}>
-        {/* Streak banner */}
+        <Text style={styles.title}>O teu Plano de 30 Dias</Text>
         <View style={styles.streakBanner}>
           <Text style={styles.streakFire}>🔥</Text>
           <View>
@@ -217,43 +135,32 @@ export default function Dashboard({ profile, onStartWorkout }) {
             <Text style={styles.streakBest}>Melhor: {streak.best} dias</Text>
           </View>
         </View>
-
-        {/* Navegação do mês */}
-        <View style={styles.monthNav}>
-          <TouchableOpacity
-            onPress={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-          >
-            <Text style={styles.monthArrow}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.monthName}>{monthName}</Text>
-          <TouchableOpacity
-            onPress={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-          >
-            <Text style={styles.monthArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Calendário */}
-        {renderCalendar()}
-
-        {/* Legenda */}
-        <View style={styles.legend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#4ade80' }]} />
-            <Text style={styles.legendText}>Completo</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#f97316' }]} />
-            <Text style={styles.legendText}>Hoje</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#7f1d1d' }]} />
-            <Text style={styles.legendText}>Falhado</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#22c55e' }]} />
-            <Text style={styles.legendText}>Recovery</Text>
-          </View>
+        <View style={styles.grid}>
+          {days.map((day) => (
+            <TouchableOpacity
+              key={day.day_number}
+              style={getCardStyle(day)}
+              onPress={() => {
+                if (day.workout_type === 'Recovery') {
+                  setRecoveryDay(day);
+                  return;
+                }
+                onStartWorkout(day);
+              }}
+            >
+              <Text style={styles.dayDate}>{formatDate(day.date)}</Text>
+              <Text style={styles.dayNumber}>Dia {day.day_number}</Text>
+              <Text style={[styles.dayType, { color: getTypeColor(day.workout_type) }]}>
+                {day.workout_type}
+              </Text>
+              {day.completed && <Text style={styles.checkmark}>✓</Text>}
+              {day.workout_type !== 'Recovery' && !day.completed && (
+                <Text style={styles.exerciseCount}>
+                  {day.exercises?.length || 0} exercícios
+                </Text>
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
       </ScrollView>
 
@@ -268,49 +175,31 @@ export default function Dashboard({ profile, onStartWorkout }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0f0f', padding: 16 },
+  title: { fontSize: 22, fontWeight: 'bold', color: '#ffffff', marginBottom: 20, marginTop: 40 },
   loadingContainer: { flex: 1, backgroundColor: '#0f0f0f', justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold', marginTop: 20, textAlign: 'center' },
   loadingSubtext: { color: '#aaaaaa', fontSize: 14, marginTop: 8, textAlign: 'center' },
   streakBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 16,
     backgroundColor: '#1e1e1e', borderRadius: 14, padding: 16,
-    marginBottom: 16, marginTop: 40, borderWidth: 1, borderColor: '#f97316'
+    marginBottom: 20, borderWidth: 1, borderColor: '#f97316'
   },
   streakFire: { fontSize: 36 },
   streakCurrent: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
   streakBest: { color: '#aaaaaa', fontSize: 13, marginTop: 2 },
-  monthNav: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 12
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  card: {
+    width: '30%', aspectRatio: 0.9, backgroundColor: '#1e1e1e',
+    borderRadius: 12, padding: 8, justifyContent: 'center',
+    alignItems: 'center', borderWidth: 1, borderColor: '#333'
   },
-  monthArrow: { color: '#ffffff', fontSize: 32, paddingHorizontal: 12 },
-  monthName: {
-    color: '#ffffff', fontSize: 18, fontWeight: 'bold',
-    textTransform: 'capitalize'
-  },
-  calendarGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 4
-  },
-  weekDay: {
-    width: '13%', textAlign: 'center',
-    color: '#aaaaaa', fontSize: 11, marginBottom: 4,
-    fontWeight: '600'
-  },
-  cell: {
-    width: '13%', aspectRatio: 0.85,
-    borderRadius: 8, borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center',
-    padding: 2,
-  },
-  emptyCell: { width: '13%', aspectRatio: 0.85 },
-  cellDate: { fontSize: 13, fontWeight: 'bold' },
-  cellPlanDay: { fontSize: 9, fontWeight: 'bold', marginTop: 1 },
-  cellCheck: { fontSize: 10, color: '#4ade80' },
-  legend: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 12,
-    marginTop: 16, marginBottom: 32
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { color: '#aaaaaa', fontSize: 12 },
+  cardCompleted: { borderColor: '#4ade80', backgroundColor: '#14532d' },
+  cardRecovery: { borderColor: '#333', opacity: 0.5 },
+  cardMissed: { borderColor: '#7f1d1d', backgroundColor: '#2a1a1a' },
+  cardToday: { borderColor: '#f97316', borderWidth: 2 },
+  dayDate: { fontSize: 9, color: '#666', marginBottom: 2 },
+  dayNumber: { fontSize: 11, color: '#aaaaaa', marginBottom: 2 },
+  dayType: { fontSize: 10, fontWeight: 'bold', textAlign: 'center' },
+  checkmark: { fontSize: 16, color: '#4ade80', marginTop: 2 },
+  exerciseCount: { fontSize: 9, color: '#666', marginTop: 2 },
 });
