@@ -20,6 +20,7 @@ export default function SetupScreen({ onSetupComplete }) {
 
     const profile = { weight, height, level };
     await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
+    await AsyncStorage.setItem('planStartDate', new Date().toISOString());
     onSetupComplete(profile);
   };
 
