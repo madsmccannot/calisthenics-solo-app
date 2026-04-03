@@ -1,16 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import {
+  View, Text, ScrollView, StyleSheet,
+  TouchableOpacity, Dimensions
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getStreakData } from '../services/localStore';
+import { LineChart } from 'react-native-chart-kit';
+import { getStreakData, getWeightLog, addWeightEntry, deleteWeightEntry } from '../services/localStore';
+import WeightModal from '../components/WeightModal';
 
-export default function StatsScreen({ profile }) {
+const screenWidth = Dimensions.get('window').width - 32;
+
+export default function StatsScreen({ profile, activeTab }) {
   const [streak, setStreak] = useState({ current: 0, best: 0 });
   const [completedDays, setCompletedDays] = useState(0);
   const [totalExercises, setTotalExercises] = useState(0);
+  const [weightLog, setWeightLog] = useState([]);
+  const [showWeightModal, setShowWeightModal] = useState(false);
 
   useEffect(() => {
-    loadStats();
-  }, []);
+    if (activeTab === 'stats') {
+      loadStats();
+    }
+  }, [activeTab]);
 
   const loadStats = async () => {
     const streakData = await getStreakData();
@@ -24,26 +35,50 @@ export default function StatsScreen({ profile }) {
       const exercises = completed.reduce((acc, d) => acc + (d.exercises?.length || 0), 0);
       setTotalExercises(exercises);
     }
+
+    const log = await getWeightLog();
+    setWeightLog(log);
+  };
+
+  const handleWeightSave = async (weight) => {
+    setShowWeightModal(false);
+    const updated = await addWeightEntry(weight);
+    setWeightLog([...updated]);
+  };
+
+  const handleWeightDelete = async (entry) => {
+    const updated = await deleteWeightEntry(entry);
+    setWeightLog([...updated]);
   };
 
   const bmi = profile
     ? (parseFloat(profile.weight) / Math.pow(parseFloat(profile.height) / 100, 2)).toFixed(1)
     : null;
 
-  const getBmiLabel = (bmi) => {
+  const getBmiInfo = (bmi) => {
     if (bmi < 18.5) return { label: 'Abaixo do peso', color: '#3b82f6' };
     if (bmi < 25) return { label: 'Peso normal', color: '#4ade80' };
     if (bmi < 30) return { label: 'Excesso de peso', color: '#f97316' };
     return { label: 'Obesidade', color: '#ef4444' };
   };
 
-  const bmiInfo = bmi ? getBmiLabel(parseFloat(bmi)) : null;
+  const getBmiColor = (weight) => {
+    if (!profile) return '#aaaaaa';
+    const heightM = parseFloat(profile.height) / 100;
+    const bmi = weight / (heightM * heightM);
+    if (bmi < 18.5) return '#3b82f6';
+    if (bmi < 25) return '#4ade80';
+    if (bmi < 30) return '#f97316';
+    return '#ef4444';
+  };
+
+  const bmiInfo = bmi ? getBmiInfo(parseFloat(bmi)) : null;
+  const hasWeightData = weightLog.length >= 1;
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>As minhas Estatísticas</Text>
 
-      {/* IMC */}
       {bmi && (
         <View style={styles.bmiCard}>
           <Text style={styles.cardLabel}>Índice de Massa Corporal</Text>
@@ -67,7 +102,6 @@ export default function StatsScreen({ profile }) {
         </View>
       )}
 
-      {/* Stats grid */}
       <View style={styles.statsGrid}>
         <View style={styles.statCard}>
           <Text style={styles.statEmoji}>🔥</Text>
@@ -91,7 +125,6 @@ export default function StatsScreen({ profile }) {
         </View>
       </View>
 
-      {/* Progresso 30 dias */}
       <View style={styles.progressCard}>
         <Text style={styles.cardLabel}>Progresso do Plano</Text>
         <Text style={styles.progressText}>{completedDays} / 30 dias</Text>
@@ -104,6 +137,74 @@ export default function StatsScreen({ profile }) {
           {Math.round((completedDays / 30) * 100)}% concluído
         </Text>
       </View>
+
+      <View style={styles.weightCard}>
+        <View style={styles.weightHeader}>
+          <Text style={styles.cardLabel}>Evolução do Peso</Text>
+          <TouchableOpacity style={styles.addWeightBtn} onPress={() => setShowWeightModal(true)}>
+            <Text style={styles.addWeightBtnText}>+ Registar</Text>
+          </TouchableOpacity>
+        </View>
+
+        {hasWeightData && weightLog.length >= 2 ? (
+          <>
+            <LineChart
+              data={{
+                labels: weightLog.map((e) => e.date),
+                datasets: [{ data: weightLog.map((e) => e.weight) }],
+              }}
+              width={screenWidth - 32}
+              height={180}
+              chartConfig={{
+                backgroundColor: '#1e1e1e',
+                backgroundGradientFrom: '#1e1e1e',
+                backgroundGradientTo: '#1e1e1e',
+                decimalPlaces: 1,
+                color: (opacity = 1) => `rgba(74, 222, 128, ${opacity})`,
+                labelColor: () => '#aaaaaa',
+                propsForDots: { r: '6', strokeWidth: '2', stroke: '#1e1e1e' },
+                propsForBackgroundLines: { stroke: '#2a2a2a' },
+              }}
+              getDotColor={(dataPoint) => getBmiColor(dataPoint)}
+              bezier
+              style={{ borderRadius: 12, marginTop: 12 }}
+            />
+          </>
+        ) : hasWeightData ? (
+          <Text style={styles.oneEntryText}>Regista mais um peso para ver o gráfico.</Text>
+        ) : (
+          <View style={styles.emptyWeight}>
+            <Text style={styles.emptyWeightText}>
+              Regista o teu peso para ver a evolução ao longo do tempo.
+            </Text>
+            <TouchableOpacity style={styles.emptyWeightBtn} onPress={() => setShowWeightModal(true)}>
+              <Text style={styles.emptyWeightBtnText}>Registar agora</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {hasWeightData && (
+          <View style={styles.weightEntries}>
+            {[...weightLog].reverse().slice(0, 3).map((e, i) => (
+              <View key={i} style={styles.weightEntry}>
+                <View style={[styles.entryDot, { backgroundColor: getBmiColor(e.weight) }]} />
+                <Text style={styles.weightEntryDate}>{e.date}</Text>
+                <Text style={[styles.weightEntryValue, { color: getBmiColor(e.weight) }]}>
+                  {e.weight} kg
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <WeightModal
+        visible={showWeightModal}
+        onSave={handleWeightSave}
+        onDelete={handleWeightDelete}
+        onDismiss={() => setShowWeightModal(false)}
+        entries={weightLog.map(e => ({ ...e, heightM: parseFloat(profile?.height) / 100 }))}
+      />
     </ScrollView>
   );
 }
@@ -118,9 +219,15 @@ const styles = StyleSheet.create({
   cardLabel: { color: '#aaaaaa', fontSize: 13, marginBottom: 8 },
   bmiNumber: { fontSize: 56, fontWeight: 'bold' },
   bmiLabel: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
-  bmiBar: { flexDirection: 'row', width: '100%', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 4 },
+  bmiBar: {
+    flexDirection: 'row', width: '100%', height: 8,
+    borderRadius: 4, overflow: 'hidden', marginBottom: 4
+  },
   bmiSegment: { flex: 1, marginHorizontal: 1 },
-  bmiBarLabels: { flexDirection: 'row', width: '100%', justifyContent: 'space-between', marginBottom: 12 },
+  bmiBarLabels: {
+    flexDirection: 'row', width: '100%',
+    justifyContent: 'space-between', marginBottom: 12
+  },
   bmiBarLabel: { color: '#666', fontSize: 10 },
   bmiSub: { color: '#aaaaaa', fontSize: 13 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
@@ -133,7 +240,7 @@ const styles = StyleSheet.create({
   statLabel: { color: '#aaaaaa', fontSize: 13, textAlign: 'center' },
   progressCard: {
     backgroundColor: '#1e1e1e', borderRadius: 16, padding: 20,
-    marginBottom: 32, borderWidth: 1, borderColor: '#333'
+    marginBottom: 16, borderWidth: 1, borderColor: '#333'
   },
   progressText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
   progressBar: {
@@ -142,4 +249,34 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: 10, backgroundColor: '#4ade80', borderRadius: 5 },
   progressPct: { color: '#aaaaaa', fontSize: 13 },
+  weightCard: {
+    backgroundColor: '#1e1e1e', borderRadius: 16, padding: 20,
+    marginBottom: 32, borderWidth: 1, borderColor: '#333'
+  },
+  weightHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+  },
+  addWeightBtn: {
+    backgroundColor: '#4ade80', paddingHorizontal: 12,
+    paddingVertical: 6, borderRadius: 8
+  },
+  addWeightBtnText: { color: '#000000', fontWeight: 'bold', fontSize: 13 },
+  oneEntryText: { color: '#aaaaaa', fontSize: 13, marginTop: 12, textAlign: 'center' },
+  weightEntries: { marginTop: 12 },
+  weightEntry: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#2a2a2a', gap: 8
+  },
+  entryDot: { width: 8, height: 8, borderRadius: 4 },
+  weightEntryDate: { color: '#aaaaaa', fontSize: 13, flex: 1 },
+  weightEntryValue: { fontSize: 13, fontWeight: 'bold' },
+  emptyWeight: { alignItems: 'center', paddingVertical: 24 },
+  emptyWeightText: {
+    color: '#aaaaaa', fontSize: 14, textAlign: 'center', marginBottom: 16, lineHeight: 22
+  },
+  emptyWeightBtn: {
+    backgroundColor: '#4ade80', paddingHorizontal: 20,
+    paddingVertical: 10, borderRadius: 10
+  },
+  emptyWeightBtnText: { color: '#000000', fontWeight: 'bold' },
 });

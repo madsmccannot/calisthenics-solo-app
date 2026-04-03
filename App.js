@@ -162,7 +162,7 @@ export default function App() {
         />
       </View>
       <View style={{ flex: 1, display: activeTab === 'stats' ? 'flex' : 'none' }}>
-        <StatsScreen profile={profile} />
+        <StatsScreen profile={profile} activeTab={activeTab} />
       </View>
       <View style={{ flex: 1, display: activeTab === 'profile' ? 'flex' : 'none' }}>
         <ProfileScreen profile={profile} onProfileUpdate={setProfile} onReset={handleReset} />

@@ -4,6 +4,7 @@ import {
   StyleSheet, ScrollView, Alert
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ConfirmModal from '../components/ConfirmModal';
 
 const LEVELS = ['Iniciante', 'Intermédio', 'Avançado'];
 
@@ -12,6 +13,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset }) {
   const [height, setHeight] = useState(profile?.height || '');
   const [level, setLevel] = useState(profile?.level || 'Iniciante');
   const [saved, setSaved] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleSave = async () => {
     if (!weight || !height) {
@@ -25,68 +27,71 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset }) {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleReset = () => {
-    Alert.alert(
-      'Resetar tudo?',
-      'Isto apaga o teu plano, progresso e streak. Tens a certeza?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Resetar', style: 'destructive', onPress: onReset },
-      ]
-    );
-  };
-
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>O meu Perfil</Text>
+    <>
+      <ScrollView style={styles.container}>
+        <Text style={styles.title}>O meu Perfil</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>Peso (kg)</Text>
-        <TextInput
-          style={styles.input}
-          keyboardType="numeric"
-          value={weight}
-          onChangeText={setWeight}
-          placeholder="ex: 78"
-          placeholderTextColor="#555"
-        />
+        <View style={styles.card}>
+          <Text style={styles.label}>Peso (kg)</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={weight}
+            onChangeText={setWeight}
+            placeholder="ex: 78"
+            placeholderTextColor="#555"
+          />
 
-        <Text style={styles.label}>Altura (cm)</Text>
-        <TextInput
-          style={styles.input}
-          keyboardType="numeric"
-          value={height}
-          onChangeText={setHeight}
-          placeholder="ex: 175"
-          placeholderTextColor="#555"
-        />
+          <Text style={styles.label}>Altura (cm)</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={height}
+            onChangeText={setHeight}
+            placeholder="ex: 175"
+            placeholderTextColor="#555"
+          />
 
-        <Text style={styles.label}>Nível de Fitness</Text>
-        <View style={styles.levelContainer}>
-          {LEVELS.map((l) => (
-            <TouchableOpacity
-              key={l}
-              style={[styles.levelBtn, level === l && styles.levelBtnActive]}
-              onPress={() => setLevel(l)}
-            >
-              <Text style={[styles.levelText, level === l && styles.levelTextActive]}>
-                {l}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <Text style={styles.label}>Nível de Fitness</Text>
+          <View style={styles.levelContainer}>
+            {LEVELS.map((l) => (
+              <TouchableOpacity
+                key={l}
+                style={[styles.levelBtn, level === l && styles.levelBtnActive]}
+                onPress={() => setLevel(l)}
+              >
+                <Text style={[styles.levelText, level === l && styles.levelTextActive]}>
+                  {l}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+            <Text style={styles.saveBtnText}>
+              {saved ? '✓ Guardado!' : 'Guardar alterações'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveBtnText}>
-            {saved ? '✓ Guardado!' : 'Guardar alterações'}
-          </Text>
+        <TouchableOpacity style={styles.resetBtn} onPress={() => setShowConfirm(true)}>
+          <Text style={styles.resetBtnText}>⚠ Resetar Tudo</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
-      <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-        <Text style={styles.resetBtnText}>⚠ Resetar Tudo</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      <ConfirmModal
+        visible={showConfirm}
+        emoji="⚠️"
+        title="Resetar tudo?"
+        message="Isto apaga o teu plano, progresso e streak. Tens a certeza?"
+        confirmText="Resetar"
+        cancelText="Cancelar"
+        confirmColor="#ef4444"
+        onConfirm={() => { setShowConfirm(false); onReset(); }}
+        onDismiss={() => setShowConfirm(false)}
+      />
+    </>
   );
 }
 
