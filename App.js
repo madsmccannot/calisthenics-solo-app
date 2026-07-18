@@ -9,6 +9,8 @@ import SplashScreen from './src/screens/SplashScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import { updateStreak } from './src/services/localStore';
+import { completeWorkout } from './src/services/progressStore';
+import { xpBreakdown, COMPLETION_BONUS } from './src/config/xpTable';
 import { BackHandler } from 'react-native';
 
 function FadeScreen({ children }) {
@@ -71,6 +73,7 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [currentWorkout, setCurrentWorkout] = useState(null);
   const [completedWorkout, setCompletedWorkout] = useState(null);
+  const [xpResult, setXpResult] = useState(null);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [dashboardKey, setDashboardKey] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -109,6 +112,28 @@ export default function App() {
       await AsyncStorage.setItem('workoutPlan', JSON.stringify(updated));
     }
     const streakData = await updateStreak();
+
+    // Progressão: calcula e credita o XP do treino
+    const className = profile.level || 'Iniciante';
+    const breakdown = xpBreakdown(currentWorkout.exercises, className);
+    const exercisesXp = breakdown.reduce((a, b) => a + b.xp, 0);
+    const reps = currentWorkout.exercises
+      .filter((e) => e.type === 'reps')
+      .reduce((a, e) => a + (Number(e.quantity) || 0), 0);
+    const seconds = currentWorkout.exercises
+      .filter((e) => e.type !== 'reps')
+      .reduce((a, e) => a + (Number(e.quantity) || 0), 0);
+
+    const result = await completeWorkout({
+      exercisesXp,
+      bonus: COMPLETION_BONUS,
+      streak: streakData.current,
+      exerciseCount: currentWorkout.exercises.length,
+      reps,
+      seconds,
+    });
+
+    setXpResult({ ...result, breakdown });
     setCurrentStreak(streakData.current);
     setCompletedWorkout(currentWorkout);
     setCurrentWorkout(null);
@@ -141,6 +166,7 @@ export default function App() {
     return (
       <WorkoutEngine
         workout={currentWorkout}
+        className={profile.level}
         onComplete={handleWorkoutComplete}
         onBack={() => setCurrentWorkout(null)}
       />
@@ -152,8 +178,10 @@ export default function App() {
       <CompletionScreen
         workout={completedWorkout}
         streak={currentStreak}
+        xpResult={xpResult}
         onBack={() => {
           setCompletedWorkout(null);
+          setXpResult(null);
           setDashboardKey((k) => k + 1);
           setActiveTab('dashboard');
         }}

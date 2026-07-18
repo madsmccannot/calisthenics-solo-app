@@ -5,12 +5,14 @@ import {
 } from 'react-native';
 import { playBeep } from '../services/soundService';
 import AnimationPlayer from '../components/AnimationPlayer';
+import { xpForExercise } from '../config/xpTable';
 
-export default function WorkoutEngine({ workout, onComplete, onBack }) {
+export default function WorkoutEngine({ workout, onComplete, onBack, className = 'Iniciante' }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [phase, setPhase] = useState('exercise');
   const [timeLeft, setTimeLeft] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [earnedXp, setEarnedXp] = useState(0);
   const intervalRef = useRef(null);
   const progressAnim = useRef(new Animated.Value(1)).current;
   const currentIndexRef = useRef(0);
@@ -19,6 +21,7 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
   const current = exercises[currentIndex];
   const isLast = currentIndex === exercises.length - 1;
   const isTimeBased = current?.type !== 'reps';
+  const currentXp = current ? xpForExercise(current, className) : 0;
 
   useEffect(() => {
     currentIndexRef.current = currentIndex;
@@ -45,6 +48,8 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
   const goToNext = () => {
     const idx = currentIndexRef.current;
     const last = idx === exercises.length - 1;
+    // credita o XP do exercício que acabou de ser concluído
+    setEarnedXp((prev) => prev + xpForExercise(exercises[idx], className));
     if (last) {
       playBeep();
       setTimeout(() => playBeep(), 400);
@@ -141,9 +146,12 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
         <TouchableOpacity onPress={onBack}>
           <Text style={styles.backBtn}>← Sair</Text>
         </TouchableOpacity>
-        <Text style={styles.progress}>
-          {currentIndex + 1} / {exercises.length}
-        </Text>
+        <View style={styles.headerRight}>
+          <Text style={styles.xpCounter}>⚡ {earnedXp} XP</Text>
+          <Text style={styles.progress}>
+            {currentIndex + 1} / {exercises.length}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.overallBar}>
@@ -156,7 +164,12 @@ export default function WorkoutEngine({ workout, onComplete, onBack }) {
         {phase === 'exercise' ? (
           <>
             <View style={styles.exerciseCard}>
-              <Text style={styles.workoutType}>{workout.workout_type}</Text>
+              <View style={styles.cardTopRow}>
+                <Text style={styles.workoutType}>{workout.workout_type}</Text>
+                <View style={styles.xpBadge}>
+                  <Text style={styles.xpBadgeText}>+{currentXp} XP</Text>
+                </View>
+              </View>
               <AnimationPlayer animationFile={current.animation_file} />
               <Text style={styles.exerciseName}>{current.display_name}</Text>
               <View style={styles.quantityBox}>
@@ -224,6 +237,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', padding: 20, paddingTop: 50
   },
   backBtn: { color: '#aaaaaa', fontSize: 16 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  xpCounter: { color: '#fbbf24', fontSize: 14, fontWeight: 'bold' },
   progress: { color: '#aaaaaa', fontSize: 14 },
   overallBar: {
     height: 4, backgroundColor: '#1e1e1e', marginHorizontal: 20, borderRadius: 2
@@ -234,7 +249,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e1e1e', borderRadius: 20, padding: 24,
     alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: '#333'
   },
-  workoutType: { color: '#f97316', fontSize: 12, fontWeight: 'bold', marginBottom: 8 },
+  cardTopRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    width: '100%', marginBottom: 8
+  },
+  workoutType: { color: '#f97316', fontSize: 12, fontWeight: 'bold' },
+  xpBadge: {
+    backgroundColor: '#0f0f0f', borderWidth: 1, borderColor: '#fbbf24',
+    borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3
+  },
+  xpBadgeText: { color: '#fbbf24', fontSize: 12, fontWeight: 'bold' },
   exerciseName: {
     color: '#ffffff', fontSize: 28, fontWeight: 'bold',
     textAlign: 'center', marginBottom: 24

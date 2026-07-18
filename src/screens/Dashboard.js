@@ -6,21 +6,32 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateWorkoutPlan } from '../services/geminiService';
 import { getStreakData, updateStreak } from '../services/localStore';
+import { getProgressSummary, rewardRecovery, markWorkoutMissionForToday } from '../services/progressStore';
+import { RECOVERY_XP } from '../config/xpTable';
 import RecoveryModal from '../components/RecoveryModal';
+import LevelHeader from '../components/LevelHeader';
+import MissionCard from '../components/MissionCard';
 
 export default function Dashboard({ profile, onStartWorkout }) {
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState({ current: 0, best: 0 });
   const [recoveryDay, setRecoveryDay] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [missionKey, setMissionKey] = useState(0);
 
   useEffect(() => {
     loadAll();
   }, []);
 
+  const refreshProgress = async () => {
+    setSummary(await getProgressSummary());
+  };
+
   const loadAll = async () => {
     const streakData = await getStreakData();
     setStreak(streakData);
+    await refreshProgress();
 
     let start = await AsyncStorage.getItem('planStartDate');
     if (!start) {
@@ -79,6 +90,13 @@ export default function Dashboard({ profile, onStartWorkout }) {
     }
     const streakData = await updateStreak();
     setStreak(streakData);
+
+    // Recuperação também dá um pouco de XP e conta a missão de treino do dia
+    await rewardRecovery(RECOVERY_XP);
+    await markWorkoutMissionForToday();
+    await refreshProgress();
+    setMissionKey((k) => k + 1);
+
     setRecoveryDay(null);
   };
 
@@ -127,14 +145,13 @@ export default function Dashboard({ profile, onStartWorkout }) {
   return (
     <>
       <ScrollView style={styles.container}>
+        <View style={styles.topSpacer} />
+        <LevelHeader summary={summary} streak={streak.current} />
+        <MissionCard
+          key={missionKey}
+          onClaimed={() => refreshProgress()}
+        />
         <Text style={styles.title}>O teu Plano de 30 Dias</Text>
-        <View style={styles.streakBanner}>
-          <Text style={styles.streakFire}>🔥</Text>
-          <View>
-            <Text style={styles.streakCurrent}>{streak.current} dias seguidos</Text>
-            <Text style={styles.streakBest}>Melhor: {streak.best} dias</Text>
-          </View>
-        </View>
         <View style={styles.grid}>
           {days.map((day) => (
             <TouchableOpacity
@@ -175,7 +192,8 @@ export default function Dashboard({ profile, onStartWorkout }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0f0f', padding: 16 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#ffffff', marginBottom: 20, marginTop: 40 },
+  topSpacer: { height: 40 },
+  title: { fontSize: 18, fontWeight: 'bold', color: '#ffffff', marginBottom: 14, marginTop: 4 },
   loadingContainer: { flex: 1, backgroundColor: '#0f0f0f', justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold', marginTop: 20, textAlign: 'center' },
   loadingSubtext: { color: '#aaaaaa', fontSize: 14, marginTop: 8, textAlign: 'center' },
