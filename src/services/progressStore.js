@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateDailyMissions } from '../config/missions';
 import { streakBonus } from '../config/xpTable';
 import { MEDALS } from '../config/medals';
+import { getItem, DEFAULT_OWNED, SLOTS, defaultItemForSlot } from '../config/shopCatalog';
 
 const GAME_KEY = 'gameState';
 
@@ -298,6 +299,62 @@ export async function checkMedals({ streak, weightLog } = {}) {
   }
   if (newly.length) await save(state);
   return newly;
+}
+
+// ---------- Loja / Avatar ----------
+function ownedSet(state) {
+  return new Set([...DEFAULT_OWNED, ...(state.ownedItems || [])]);
+}
+
+// Normaliza o avatar: cada slot -> id válido e possuído, senão o item grátis.
+function normalizeAvatar(avatar = {}, owned) {
+  const out = {};
+  for (const slot of SLOTS) {
+    const id = avatar[slot];
+    const item = getItem(id);
+    out[slot] = item && item.slot === slot && owned.has(id) ? id : defaultItemForSlot(slot);
+  }
+  return out;
+}
+
+// Estado para o ecrã de aparência/loja.
+export async function getLockerState() {
+  const state = await getGameState();
+  const owned = ownedSet(state);
+  return {
+    avatar: normalizeAvatar(state.avatar, owned),
+    owned: Array.from(owned),
+    coins: state.coins,
+  };
+}
+
+// Só o avatar normalizado (para desenhar em qualquer sítio).
+export async function getAvatar() {
+  const state = await getGameState();
+  return normalizeAvatar(state.avatar, ownedSet(state));
+}
+
+export async function buyItem(itemId) {
+  const state = await getGameState();
+  const item = getItem(itemId);
+  if (!item) return { ok: false, reason: 'invalid' };
+  if (ownedSet(state).has(itemId)) return { ok: false, reason: 'owned' };
+  if (state.coins < item.cost) return { ok: false, reason: 'coins', coins: state.coins };
+  state.coins -= item.cost;
+  state.ownedItems = Array.from(new Set([...(state.ownedItems || []), itemId]));
+  // compra equipa logo
+  state.avatar = { ...normalizeAvatar(state.avatar, ownedSet(state)), [item.slot]: itemId };
+  await save(state);
+  return { ok: true, coins: state.coins };
+}
+
+export async function equipItem(slot, itemId) {
+  const state = await getGameState();
+  const item = getItem(itemId);
+  if (!item || item.slot !== slot || !ownedSet(state).has(itemId)) return null;
+  state.avatar = { ...normalizeAvatar(state.avatar, ownedSet(state)), [slot]: itemId };
+  await save(state);
+  return state.avatar;
 }
 
 // Lista completa de medalhas com o estado de desbloqueio (para a parede).
