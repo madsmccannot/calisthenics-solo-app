@@ -4,6 +4,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateWorkoutPlan } from './geminiService';
+import { scheduleSync } from './cloudSync';
 
 const PLAN_KEY = 'workoutPlan';
 const PLAN_CLASS_KEY = 'planClass'; // classe com que os treinos do plano foram gerados
@@ -51,6 +52,7 @@ export async function generateSeasonPlan(profile, season = 1, startDate = new Da
   await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(plan));
   await AsyncStorage.setItem(PLAN_START_KEY, startD.toISOString());
   await AsyncStorage.setItem(PLAN_CLASS_KEY, profile.level);
+  scheduleSync();
   return plan;
 }
 
@@ -132,5 +134,6 @@ export async function regenerateFuturePlan(profile) {
 
   await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(updated));
   await AsyncStorage.setItem(PLAN_CLASS_KEY, profile.level);
+  scheduleSync();
   return { changed };
 }

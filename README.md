@@ -47,12 +47,19 @@ src/
 └── theme.js      central colors / radii / spacing
 ```
 
+## Social feed
+- 📣 **Feed** — your real milestones (workouts, level ups, medals, streaks, seasons) shown with your avatar
+- 🌐 **Online-ready** — set `EXPO_PUBLIC_FEED_API_URL` and the feed pulls **other people's** real milestones and publishes yours. Without a backend it falls back to local simulated activity so the feed isn't empty. Backend contract is documented in `src/services/feedRemote.js`:
+  - `GET  {BASE}/feed?limit=50&clientId=<id>` → `[{ id, ts, name, emoji, title, subtitle? }]` (excluding that clientId)
+  - `POST {BASE}/feed` → `{ clientId, ts, emoji, title, subtitle? }`
+
 ## Setup
 1. `npm install`
 2. Put your key in `.env`: `EXPO_PUBLIC_GEMINI_API_KEY=your_key` (git-ignored)
-3. `npx expo start --tunnel`
+3. *(optional, for the online feed)* add `EXPO_PUBLIC_FEED_API_URL=https://your-backend`
+4. `npx expo start --tunnel`
 
 ## Roadmap
-- ⬜ Feed (own milestones now; ready to show others' when online)
+- ⬜ Backend for the online feed (client is already wired — see above)
 - ⬜ 3D exercise animations (metallic/transparent, procedural — replacing Lottie)
 - ⬜ Real monetization model (the coin shop is a placeholder)

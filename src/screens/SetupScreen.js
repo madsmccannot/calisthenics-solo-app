@@ -4,6 +4,7 @@ import {
   StyleSheet, ScrollView, Alert
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { scheduleSync } from '../services/cloudSync';
 
 const LEVELS = ['Iniciante', 'Intermédio', 'Avançado'];
 
@@ -21,6 +22,7 @@ export default function SetupScreen({ onSetupComplete }) {
     const profile = { weight, height, level };
     await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
     await AsyncStorage.setItem('planStartDate', new Date().toISOString());
+    scheduleSync();
     onSetupComplete(profile);
   };
 

@@ -1,7 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { scheduleSync } from './cloudSync';
 
 const STREAK_KEY = 'streakData';
 const WEIGHT_LOG_KEY = 'weightLog';
+const CLIENT_ID_KEY = 'clientId';
+
+// Id anónimo e persistente do dispositivo — usado para publicar os marcos do
+// utilizador no feed online (o backend associa-o a um nome/perfil).
+export async function getClientId() {
+  try {
+    let id = await AsyncStorage.getItem(CLIENT_ID_KEY);
+    if (!id) {
+      id = 'c_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      await AsyncStorage.setItem(CLIENT_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return 'c_anon';
+  }
+}
 
 export async function getStreakData() {
   try {
@@ -35,6 +52,7 @@ export async function updateStreak() {
     };
 
     await AsyncStorage.setItem(STREAK_KEY, JSON.stringify(updated));
+    scheduleSync();
     return updated;
   } catch {
     return { current: 0, best: 0, lastCompletedDate: null };
@@ -63,6 +81,7 @@ export async function addWeightEntry(weight) {
     // Mantém só as últimas 8 entradas
     const trimmed = updated.slice(-8);
     await AsyncStorage.setItem(WEIGHT_LOG_KEY, JSON.stringify(trimmed));
+    scheduleSync();
     return trimmed;
   } catch {
     return [];
@@ -74,6 +93,7 @@ export async function deleteWeightEntry(entry) {
     const log = await getWeightLog();
     const updated = log.filter((e) => !(e.date === entry.date && e.weight === entry.weight));
     await AsyncStorage.setItem(WEIGHT_LOG_KEY, JSON.stringify(updated));
+    scheduleSync();
     return updated;
   } catch {
     return [];

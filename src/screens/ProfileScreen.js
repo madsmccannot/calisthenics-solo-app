@@ -12,6 +12,7 @@ import { colors, radius } from '../theme';
 import { getRegenerableCount, regenerateFuturePlan, getPlanClass } from '../services/planService';
 import { getProgressSummary, getAvatar } from '../services/progressStore';
 import { getStreakData } from '../services/localStore';
+import { scheduleSync, getDisplayName } from '../services/cloudSync';
 
 const LEVELS = ['Iniciante', 'Intermédio', 'Avançado'];
 
@@ -34,7 +35,7 @@ function formatTime(totalSeconds = 0) {
   return `${h}h ${m % 60}m`;
 }
 
-export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPlanChanged, activeTab }) {
+export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPlanChanged, activeTab, onSignOut, email }) {
   const [weight, setWeight] = useState(profile?.weight || '');
   const [height, setHeight] = useState(profile?.height || '');
   const [level, setLevel] = useState(profile?.level || 'Iniciante');
@@ -50,6 +51,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
   const [summary, setSummary] = useState(null);
   const [streak, setStreak] = useState({ current: 0, best: 0 });
   const [showLocker, setShowLocker] = useState(false);
+  const [displayName, setDisplayName] = useState(null);
 
   useEffect(() => {
     if (activeTab === undefined || activeTab === 'profile') loadAll();
@@ -61,6 +63,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
     setAvatar(await getAvatar());
     setSummary(await getProgressSummary());
     setStreak(await getStreakData());
+    setDisplayName(await getDisplayName());
   };
 
   const loadDiffers = level !== planClass && regenCount > 0;
@@ -75,6 +78,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
     const updated = { weight, height, level };
     await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
     onProfileUpdate(updated);
+    scheduleSync();
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -117,8 +121,15 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
         <View style={styles.identityCard}>
           <Avatar avatar={avatar} size={110} />
           <View style={styles.identityInfo}>
-            <Text style={styles.identityTitle}>{summary?.title || 'Novato'}</Text>
-            <Text style={styles.identitySub}>Nível {summary?.level ?? 1}</Text>
+            <Text style={styles.identityTitle} numberOfLines={1}>
+              {displayName || summary?.title || 'Novato'}
+            </Text>
+            <Text style={styles.identitySub}>
+              Nível {summary?.level ?? 1} · {summary?.title || 'Novato'}
+            </Text>
+            {email ? (
+              <Text style={styles.identityEmail} numberOfLines={1}>{email}</Text>
+            ) : null}
             <View style={styles.coinPill}>
               <Text style={styles.coinText}>🪙 {summary?.coins ?? 0}</Text>
             </View>
@@ -193,6 +204,12 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
           )}
         </View>
 
+        {onSignOut && (
+          <TouchableOpacity style={styles.signOutBtn} onPress={onSignOut}>
+            <Text style={styles.signOutText}>Sair da conta</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={styles.resetBtn} onPress={() => setShowConfirm(true)}>
           <Text style={styles.resetBtnText}>⚠ Resetar Tudo</Text>
         </TouchableOpacity>
@@ -261,6 +278,7 @@ const styles = StyleSheet.create({
   identityInfo: { flex: 1, marginLeft: 18 },
   identityTitle: { color: colors.text, fontSize: 22, fontWeight: 'bold' },
   identitySub: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
+  identityEmail: { color: colors.textFaint, fontSize: 12, marginTop: 4 },
   coinPill: {
     alignSelf: 'flex-start', marginTop: 12, backgroundColor: colors.bg,
     borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 6,
@@ -308,6 +326,11 @@ const styles = StyleSheet.create({
   },
   applyLoadText: { color: colors.gold, fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
   applyLoadSub: { color: colors.textMuted, fontSize: 11, marginTop: 4, textAlign: 'center' },
+  signOutBtn: {
+    marginTop: 8, padding: 14, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border, alignItems: 'center',
+  },
+  signOutText: { color: colors.textMuted, fontSize: 15 },
   resetBtn: {
     marginTop: 8, marginBottom: 80, padding: 14,
     borderRadius: radius.md, borderWidth: 1, borderColor: colors.red, alignItems: 'center',

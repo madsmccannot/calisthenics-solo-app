@@ -7,6 +7,8 @@ import { generateDailyMissions } from '../config/missions';
 import { streakBonus } from '../config/xpTable';
 import { MEDALS } from '../config/medals';
 import { getItem, DEFAULT_OWNED, SLOTS, defaultItemForSlot } from '../config/shopCatalog';
+import { publishEvent } from './feedRemote';
+import { scheduleSync } from './cloudSync';
 
 const GAME_KEY = 'gameState';
 
@@ -26,6 +28,7 @@ const DEFAULT_STATE = {
   },
   ownedItems: [], // compras na loja — Fase 3
   missions: null, // { date, items:[...], claimed }
+  feedEvents: [], // marcos do próprio utilizador para o Feed (mais recente primeiro)
   stats: {
     totalWorkouts: 0,
     totalExercises: 0,
@@ -94,6 +97,7 @@ export async function getGameState() {
 
 async function save(state) {
   await AsyncStorage.setItem(GAME_KEY, JSON.stringify(state));
+  scheduleSync(); // espelha para a nuvem (debounced; no-op se offline/sem conta)
   return state;
 }
 
@@ -262,6 +266,28 @@ export async function rewardRecovery(amount) {
   return addXp(amount);
 }
 
+// ---------- Feed (marcos do próprio) ----------
+function pushFeed(state, event) {
+  const item = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    ts: Date.now(),
+    who: 'you',
+    ...event,
+  };
+  state.feedEvents = [item, ...(state.feedEvents || [])].slice(0, 50);
+  publishEvent(item); // fire-and-forget: publica no backend se estiver configurado
+}
+
+export async function logFeedEvent(event) {
+  const state = await getGameState();
+  pushFeed(state, event);
+  await save(state);
+}
+
+export async function getFeedEvents() {
+  return (await getGameState()).feedEvents || [];
+}
+
 // ---------- Seasons ----------
 export async function getSeason() {
   return (await getGameState()).season || 1;
@@ -315,6 +341,7 @@ export async function checkMedals({ streak, weightLog } = {}) {
       state.medals[m.id] = new Date().toISOString();
       state.coins += m.coins;
       newly.push(m);
+      pushFeed(state, { emoji: m.emoji, title: `Medalha: ${m.title}` });
     }
   }
   if (newly.length) await save(state);
