@@ -40,3 +40,8 @@ yarn-error.*
 /ios
 /android
 .env
+
+# probably images
+*.jpeg
+*.Zone.Identifier
+*.swp
