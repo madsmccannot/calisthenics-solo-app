@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { colors, radius } from '../theme';
 
-export default function CompletionScreen({ workout, streak, xpResult, onBack }) {
+export default function CompletionScreen({ workout, streak, xpResult, onBack, onStartNextSeason }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const levelUpAnim = useRef(new Animated.Value(0)).current;
@@ -14,6 +14,8 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack }) 
   const total = xpResult?.total ?? 0;
   const coinsEarned = xpResult?.coinsEarned ?? 0;
   const newMedals = xpResult?.newMedals ?? [];
+  const seasonComplete = xpResult?.seasonComplete;
+  const season = xpResult?.season ?? 1;
   const breakdown = xpResult?.breakdown ?? [];
   const levelInfo = xpResult?.levelInfo;
   const progress = Math.max(0, Math.min(1, levelInfo?.progress ?? 0));
@@ -50,6 +52,17 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack }) 
 
           <Text style={styles.title}>Treino Concluído!</Text>
           <Text style={styles.subtitle}>Dia {workout.day_number} completo</Text>
+
+          {seasonComplete && (
+            <View style={styles.seasonBox}>
+              <Text style={styles.seasonEmoji}>🎉</Text>
+              <Text style={styles.seasonTitle}>Season {season} Completa!</Text>
+              <Text style={styles.seasonSub}>
+                Terminaste os 30 dias. A tua streak e o teu progresso continuam —
+                a próxima season chega mais difícil.
+              </Text>
+            </View>
+          )}
 
           {/* Total de XP ganho */}
           <View style={styles.xpTotalBox}>
@@ -154,9 +167,15 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack }) 
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-            <Text style={styles.backBtnText}>Ver o meu Plano →</Text>
-          </TouchableOpacity>
+          {seasonComplete ? (
+            <TouchableOpacity style={styles.backBtn} onPress={onStartNextSeason}>
+              <Text style={styles.backBtnText}>Começar Season {season + 1} →</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.backBtn} onPress={onBack}>
+              <Text style={styles.backBtnText}>Ver o meu Plano →</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </Animated.View>
     </View>
@@ -177,6 +196,13 @@ const styles = StyleSheet.create({
   },
   xpTotalLabel: { color: colors.textMuted, fontSize: 13, marginBottom: 4 },
   xpTotalValue: { color: colors.gold, fontSize: 48, fontWeight: 'bold' },
+  seasonBox: {
+    width: '100%', backgroundColor: colors.card, borderRadius: radius.xl,
+    padding: 20, borderWidth: 1, borderColor: colors.purple, marginBottom: 20, alignItems: 'center',
+  },
+  seasonEmoji: { fontSize: 40, marginBottom: 8 },
+  seasonTitle: { color: colors.purple, fontSize: 20, fontWeight: 'bold', marginBottom: 6 },
+  seasonSub: { color: colors.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 20 },
   coinsEarned: { color: colors.gold, fontSize: 15, fontWeight: 'bold', marginTop: 4 },
   medalsBox: {
     width: '100%', backgroundColor: colors.card, borderRadius: radius.xl,

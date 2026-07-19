@@ -4,10 +4,11 @@ import {
   ScrollView, ActivityIndicator
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { generateWorkoutPlan } from '../services/geminiService';
 import { getStreakData, updateStreak, getWeightLog } from '../services/localStore';
-import { getProgressSummary, rewardRecovery, markWorkoutMissionForToday, checkMedals } from '../services/progressStore';
+import { getProgressSummary, rewardRecovery, markWorkoutMissionForToday, checkMedals, getSeason, seasonTier } from '../services/progressStore';
+import { generateSeasonPlan } from '../services/planService';
 import { RECOVERY_XP } from '../config/xpTable';
+import { colors } from '../theme';
 import RecoveryModal from '../components/RecoveryModal';
 import LevelHeader from '../components/LevelHeader';
 import MissionCard from '../components/MissionCard';
@@ -22,6 +23,7 @@ export default function Dashboard({ profile, onStartWorkout }) {
   const [summary, setSummary] = useState(null);
   const [missionKey, setMissionKey] = useState(0);
   const [emptyDayInfo, setEmptyDayInfo] = useState(false);
+  const [season, setSeason] = useState(1);
 
   useEffect(() => {
     loadAll();
@@ -35,12 +37,8 @@ export default function Dashboard({ profile, onStartWorkout }) {
     const streakData = await getStreakData();
     setStreak(streakData);
     await refreshProgress();
-
-    let start = await AsyncStorage.getItem('planStartDate');
-    if (!start) {
-      start = new Date().toISOString();
-      await AsyncStorage.setItem('planStartDate', start);
-    }
+    const s = await getSeason();
+    setSeason(s);
 
     const saved = await AsyncStorage.getItem('workoutPlan');
     if (saved) {
@@ -62,36 +60,10 @@ export default function Dashboard({ profile, onStartWorkout }) {
       return;
     }
 
-    const startD = new Date(start);
-    startD.setHours(0, 0, 0, 0);
-    await generateFullPlan(startD);
-  };
-
-  const generateFullPlan = async (startD) => {
+    // sem plano -> gera a season atual, ancorada a hoje
     setLoading(true);
     setGenerating(true);
-    const plan = [];
-    for (let i = 1; i <= 30; i++) {
-      const date = new Date(startD);
-      date.setDate(startD.getDate() + i - 1);
-      if (i % 7 === 0) {
-        plan.push({
-          day_number: i,
-          date: date.toISOString(),
-          workout_type: 'Recovery',
-          exercises: [],
-          completed: false,
-        });
-      } else {
-        const workout = await generateWorkoutPlan(profile, i);
-        if (workout) {
-          // fixa o day_number: o Gemini às vezes devolve o do exemplo (1)
-          plan.push({ ...workout, day_number: i, date: date.toISOString(), completed: false });
-        }
-      }
-    }
-    await AsyncStorage.setItem('workoutPlan', JSON.stringify(plan));
-    await AsyncStorage.setItem('planClass', profile.level); // classe base do plano
+    const plan = await generateSeasonPlan(profile, s, new Date());
     setDays(plan);
     setGenerating(false);
     setLoading(false);
@@ -129,22 +101,16 @@ export default function Dashboard({ profile, onStartWorkout }) {
     await refreshProgress();
   };
 
+  // O "dia atual" é o primeiro por fazer (não de recuperação). Como o plano é
+  // ao teu ritmo, não há dias "falhados" — só concluídos, atual e por fazer.
+  const currentDay = days.find((d) => !d.completed && d.workout_type !== 'Recovery');
+
   const getCardStyle = (day) => {
     if (day.completed) return [styles.card, styles.cardCompleted];
     if (day.workout_type === 'Recovery') return [styles.card, styles.cardRecovery];
-
-    // Dia passado não completo
-    if (day.date) {
-      const d = new Date(day.date);
-      d.setHours(0, 0, 0, 0);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (d < today) return [styles.card, styles.cardMissed];
-
-      // Hoje
-      if (d.getTime() === today.getTime()) return [styles.card, styles.cardToday];
+    if (currentDay && day.day_number === currentDay.day_number) {
+      return [styles.card, styles.cardToday];
     }
-
     return [styles.card];
   };
 
@@ -184,7 +150,28 @@ export default function Dashboard({ profile, onStartWorkout }) {
           key={missionKey}
           onClaimed={handleMissionClaimed}
         />
-        <Text style={styles.title}>O teu Plano de 30 Dias</Text>
+
+        {(() => {
+          const nonRec = days.filter((d) => d.workout_type !== 'Recovery');
+          const done = nonRec.filter((d) => d.completed).length;
+          const total = nonRec.length || 1;
+          const tier = seasonTier(season);
+          return (
+            <View style={styles.seasonCard}>
+              <View style={styles.seasonHeader}>
+                <View>
+                  <Text style={styles.seasonName}>Season {season}</Text>
+                  {tier && <Text style={styles.seasonTier}>{tier}</Text>}
+                </View>
+                <Text style={styles.seasonCount}>{done} / {total} dias</Text>
+              </View>
+              <View style={styles.seasonBar}>
+                <View style={[styles.seasonFill, { width: `${(done / total) * 100}%` }]} />
+              </View>
+            </View>
+          );
+        })()}
+
         <View style={styles.grid}>
           {days.map((day) => (
             <TouchableOpacity
@@ -251,6 +238,21 @@ const styles = StyleSheet.create({
   streakFire: { fontSize: 36 },
   streakCurrent: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
   streakBest: { color: '#aaaaaa', fontSize: 13, marginTop: 2 },
+  seasonCard: {
+    backgroundColor: '#1e1e1e', borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: '#333', marginBottom: 16
+  },
+  seasonHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12
+  },
+  seasonName: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
+  seasonTier: { color: '#a78bfa', fontSize: 12, fontWeight: 'bold', marginTop: 2 },
+  seasonCount: { color: '#aaaaaa', fontSize: 14 },
+  seasonBar: {
+    height: 10, backgroundColor: '#0f0f0f', borderRadius: 5, overflow: 'hidden',
+    borderWidth: 1, borderColor: '#333'
+  },
+  seasonFill: { height: '100%', backgroundColor: '#4ade80', borderRadius: 5 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
     width: '30%', aspectRatio: 0.9, backgroundColor: '#1e1e1e',

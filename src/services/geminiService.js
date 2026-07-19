@@ -65,18 +65,22 @@ const DAILY_FOCUS = [
   { type: 'Full Body', focus: 'Corpo inteiro em circuito — alterna grupos musculares.' },
 ];
 
-export async function generateWorkoutPlan(profile, dayNumber = 1) {
+export async function generateWorkoutPlan(profile, dayNumber = 1, season = 1) {
   const guidance = LEVEL_GUIDANCE[profile.level] || LEVEL_GUIDANCE.Iniciante;
   const today = DAILY_FOCUS[(dayNumber - 1) % DAILY_FOCUS.length];
+  const seasonRule =
+    season > 1
+      ? `\nESTA É A SEASON ${season}: aumenta a dificuldade em relação às seasons anteriores — mais repetições (cerca de +${(season - 1) * 15}%), variações mais difíceis e descansos um pouco mais curtos, SEM deixar de respeitar a regra de carga do nível.`
+      : '';
   const userPrompt = `
 Gera o treino para o Dia ${dayNumber} com estes dados:
 - Peso: ${profile.weight}kg
 - Altura: ${profile.height}cm
 - Nível: ${profile.level}
-- Dia do plano: ${dayNumber} de 30
+- Season: ${season} · Dia do plano: ${dayNumber} de 30
 
 FOCO DESTE DIA (obrigatório): ${today.focus}
-Usa "workout_type": "${today.type}".
+Usa "workout_type": "${today.type}".${seasonRule}
 
 VARIEDADE (obrigatório): escolhe exercícios adequados a este foco e VARIA em relação a outros dias.
 NÃO repitas sempre a mesma sequência nem os mesmos números de repetições. Varia a ordem, os

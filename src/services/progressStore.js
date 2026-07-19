@@ -262,6 +262,26 @@ export async function rewardRecovery(amount) {
   return addXp(amount);
 }
 
+// ---------- Seasons ----------
+export async function getSeason() {
+  return (await getGameState()).season || 1;
+}
+
+export async function advanceSeason() {
+  const state = await getGameState();
+  state.season = (state.season || 1) + 1;
+  await save(state);
+  return state.season;
+}
+
+// Rótulo de tier por season: 1-3 numeradas, depois Elite/Master/Legend.
+export function seasonTier(season = 1) {
+  if (season >= 10) return 'Legend';
+  if (season >= 7) return 'Master';
+  if (season >= 4) return 'Elite';
+  return null;
+}
+
 // Marca a missão de treino do dia como feita sem creditar XP de treino
 // (usado quando um dia de recuperação é concluído).
 export async function markWorkoutMissionForToday() {

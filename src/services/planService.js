@@ -7,6 +7,52 @@ import { generateWorkoutPlan } from './geminiService';
 
 const PLAN_KEY = 'workoutPlan';
 const PLAN_CLASS_KEY = 'planClass'; // classe com que os treinos do plano foram gerados
+const PLAN_START_KEY = 'planStartDate';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Gera um treino com 1 nova tentativa (dodges rate-limit / falhas pontuais).
+async function generateWithRetry(profile, dayNumber, season) {
+  let w = await generateWorkoutPlan(profile, dayNumber, season);
+  if (!w) {
+    await sleep(4000);
+    w = await generateWorkoutPlan(profile, dayNumber, season);
+  }
+  return w;
+}
+
+// Gera o plano completo de uma season (30 dias), ancorado a `startDate`.
+// Recovery a cada 7º dia. Dias que a IA falhar ficam vazios (o Dashboard avisa).
+// Garante SEMPRE 30 dias e grava plano + data de início + classe.
+export async function generateSeasonPlan(profile, season = 1, startDate = new Date()) {
+  const startD = new Date(startDate);
+  startD.setHours(0, 0, 0, 0);
+
+  const plan = [];
+  for (let i = 1; i <= 30; i++) {
+    const date = new Date(startD);
+    date.setDate(startD.getDate() + i - 1);
+    const iso = date.toISOString();
+
+    if (i % 7 === 0) {
+      plan.push({ day_number: i, date: iso, workout_type: 'Recovery', exercises: [], completed: false });
+      continue;
+    }
+    const w = await generateWithRetry(profile, i, season);
+    if (w) {
+      plan.push({ ...w, day_number: i, date: iso, completed: false });
+    } else {
+      // placeholder — mantém sempre 30 dias; o utilizador pode reaplicar a carga
+      plan.push({ day_number: i, date: iso, workout_type: 'Strength', exercises: [], completed: false });
+    }
+    await sleep(1200);
+  }
+
+  await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(plan));
+  await AsyncStorage.setItem(PLAN_START_KEY, startD.toISOString());
+  await AsyncStorage.setItem(PLAN_CLASS_KEY, profile.level);
+  return plan;
+}
 
 export async function getPlanClass() {
   return AsyncStorage.getItem(PLAN_CLASS_KEY);

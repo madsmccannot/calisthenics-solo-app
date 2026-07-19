@@ -9,7 +9,7 @@ import SplashScreen from './src/screens/SplashScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import { updateStreak, getWeightLog } from './src/services/localStore';
-import { completeWorkout, checkMedals } from './src/services/progressStore';
+import { completeWorkout, checkMedals, getSeason, advanceSeason } from './src/services/progressStore';
 import { xpBreakdown, COMPLETION_BONUS } from './src/config/xpTable';
 import { BackHandler } from 'react-native';
 
@@ -101,6 +101,7 @@ export default function App() {
   };
 
   const handleWorkoutComplete = async () => {
+    let seasonComplete = false;
     const saved = await AsyncStorage.getItem('workoutPlan');
     if (saved) {
       const plan = JSON.parse(saved);
@@ -110,6 +111,11 @@ export default function App() {
           : day
       );
       await AsyncStorage.setItem('workoutPlan', JSON.stringify(updated));
+      // season completa quando não sobram dias de treino (ignora recuperação)
+      const remaining = updated.filter(
+        (d) => !d.completed && d.workout_type !== 'Recovery'
+      ).length;
+      seasonComplete = remaining === 0;
     }
     const streakData = await updateStreak();
 
@@ -147,10 +153,22 @@ export default function App() {
     const weightLog = await getWeightLog();
     const newMedals = await checkMedals({ streak: streakData, weightLog });
 
-    setXpResult({ ...result, breakdown, newMedals });
+    const season = await getSeason();
+    setXpResult({ ...result, breakdown, newMedals, seasonComplete, season });
     setCurrentStreak(streakData.current);
     setCompletedWorkout(currentWorkout);
     setCurrentWorkout(null);
+  };
+
+  // Avança para a próxima season: gera um plano novo (mais difícil) ancorado a
+  // hoje. NÃO mexe na streak nem no XP/moedas/medalhas — só o plano é renovado.
+  const handleStartNextSeason = async () => {
+    await AsyncStorage.removeItem('workoutPlan');
+    await advanceSeason();
+    setCompletedWorkout(null);
+    setXpResult(null);
+    setDashboardKey((k) => k + 1);
+    setActiveTab('dashboard');
   };
 
   const handleReset = async () => {
@@ -193,6 +211,7 @@ export default function App() {
         workout={completedWorkout}
         streak={currentStreak}
         xpResult={xpResult}
+        onStartNextSeason={handleStartNextSeason}
         onBack={() => {
           setCompletedWorkout(null);
           setXpResult(null);
