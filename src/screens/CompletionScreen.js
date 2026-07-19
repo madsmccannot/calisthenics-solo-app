@@ -82,8 +82,8 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
                 <View key={m.id} style={styles.medalRow}>
                   <Text style={styles.medalEmoji}>{m.emoji}</Text>
                   <View style={styles.medalInfo}>
-                    <Text style={styles.medalName}>{m.title}</Text>
-                    <Text style={styles.medalDesc}>{m.desc}</Text>
+                    <Text style={styles.medalName}>{t('medal.' + m.id + '.title')}</Text>
+                    <Text style={styles.medalDesc}>{t('medal.' + m.id + '.desc')}</Text>
                   </View>
                   <Text style={styles.medalCoins}>+{m.coins} 🪙</Text>
                 </View>
@@ -96,7 +96,7 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
             <Animated.View style={[styles.levelUpBox, { opacity: levelUpAnim }]}>
               <Text style={styles.levelUpText}>⭐ {t('completion.levelUp')}</Text>
               <Text style={styles.levelUpSub}>
-                {xpResult.fromLevel} → {xpResult.toLevel} · {xpResult.title}
+                {xpResult.fromLevel} → {xpResult.toLevel} · {t(xpResult.title)}
               </Text>
             </Animated.View>
           )}

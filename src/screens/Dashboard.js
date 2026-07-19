@@ -163,7 +163,7 @@ export default function Dashboard({ profile, onStartWorkout }) {
               <View style={styles.seasonHeader}>
                 <View>
                   <Text style={styles.seasonName}>{t('dashboard.season')} {season}</Text>
-                  {tier && <Text style={styles.seasonTier}>{tier}</Text>}
+                  {tier && <Text style={styles.seasonTier}>{t(tier)}</Text>}
                 </View>
                 <Text style={styles.seasonCount}>{t('dashboard.daysCount', { done, total })}</Text>
               </View>

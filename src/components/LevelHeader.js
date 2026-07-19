@@ -10,7 +10,7 @@ export default function LevelHeader({ summary, streak = 0 }) {
   const fillAnim = useRef(new Animated.Value(0)).current;
 
   const level = summary?.level ?? 1;
-  const title = summary?.title ?? 'Novato';
+  const title = t(summary?.title ?? 'title.novice');
   const xpInto = summary?.xpIntoLevel ?? 0;
   const xpNext = summary?.xpForNext ?? 125;
   const coins = summary?.coins ?? 0;

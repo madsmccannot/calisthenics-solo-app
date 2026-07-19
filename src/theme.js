@@ -1,32 +1,31 @@
-// Sistema visual central da app. Antes destas constantes, as cores estavam
-// copiadas à mão em todos os ecrãs. Todo o UI novo (gamificação) deve usar isto
-// para manter a coerência visual; os ecrãs antigos migram aos poucos.
+// Central visual system. Before these constants, colors were copied by hand
+// across every screen. New UI should use this to keep visual consistency.
 
 export const colors = {
-  // superfícies
+  // surfaces
   bg: '#0f0f0f',
   card: '#1e1e1e',
   cardInner: '#2a2a2a',
   border: '#333333',
   borderLight: '#444444',
 
-  // acentos
-  primary: '#4ade80', // verde principal
-  orange: '#f97316', // HIIT / streak / hoje
+  // accents
+  primary: '#4ade80', // main green
+  orange: '#f97316', // HIIT / streak / today
   blue: '#3b82f6',
   red: '#ef4444',
   green: '#22c55e', // recovery
-  gold: '#fbbf24', // XP / moedas / nível
-  purple: '#a78bfa', // títulos / raridade
-  bronze: '#cd7f32', // medalha tier bronze
-  silver: '#cbd5e1', // medalha tier prata
+  gold: '#fbbf24', // XP / coins / level
+  purple: '#a78bfa', // titles / rarity
+  bronze: '#cd7f32', // bronze medal tier
+  silver: '#cbd5e1', // silver medal tier
 
-  // texto
+  // text
   text: '#ffffff',
   textMuted: '#aaaaaa',
   textFaint: '#666666',
   textDim: '#555555',
-  onPrimary: '#000000', // texto sobre botões verdes
+  onPrimary: '#000000', // text on green buttons
 
   overlay: 'rgba(0,0,0,0.75)',
 };
@@ -49,7 +48,7 @@ export const spacing = {
   xxl: 32,
 };
 
-// cor associada ao tipo de treino (usada no Dashboard e no motor de treino)
+// Color associated with the workout type (used in Dashboard and workout engine).
 export function typeColor(type) {
   switch (type) {
     case 'HIIT':

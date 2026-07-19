@@ -59,12 +59,7 @@ export default function SetupScreen({ onSetupComplete }) {
             style={[styles.levelBtn, level === l && styles.levelBtnActive]}
             onPress={() => setLevel(l)}
           >
-            <Text
-              style={[styles.levelText, level === l && styles.levelTextActive]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-            >
+            <Text style={[styles.levelText, level === l && styles.levelTextActive]}>
               {t('level.' + l)}
             </Text>
           </TouchableOpacity>
@@ -88,11 +83,12 @@ const styles = StyleSheet.create({
   },
   levelContainer: { flexDirection: 'row', gap: 10, marginTop: 8 },
   levelBtn: {
-    flex: 1, padding: 12, borderRadius: 10,
-    backgroundColor: '#1e1e1e', borderWidth: 1, borderColor: '#333', alignItems: 'center'
+    flex: 1, paddingVertical: 12, paddingHorizontal: 4, borderRadius: 10, minHeight: 48,
+    backgroundColor: '#1e1e1e', borderWidth: 1, borderColor: '#333',
+    alignItems: 'center', justifyContent: 'center'
   },
   levelBtnActive: { backgroundColor: '#4ade80', borderColor: '#4ade80' },
-  levelText: { color: '#aaaaaa', fontWeight: '600' },
+  levelText: { color: '#aaaaaa', fontWeight: '600', fontSize: 13, textAlign: 'center' },
   levelTextActive: { color: '#000000' },
   startBtn: {
     marginTop: 40, backgroundColor: '#4ade80', padding: 16,

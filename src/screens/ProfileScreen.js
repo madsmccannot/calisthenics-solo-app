@@ -125,10 +125,10 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
           <Avatar avatar={avatar} size={110} />
           <View style={styles.identityInfo}>
             <Text style={styles.identityTitle} numberOfLines={1}>
-              {displayName || summary?.title || 'Novato'}
+              {displayName || t(summary?.title || 'title.novice')}
             </Text>
             <Text style={styles.identitySub}>
-              {t('profile.statLevel')} {summary?.level ?? 1} · {summary?.title || 'Novato'}
+              {t('profile.statLevel')} {summary?.level ?? 1} · {t(summary?.title || 'title.novice')}
             </Text>
             {email ? (
               <Text style={styles.identityEmail} numberOfLines={1}>{email}</Text>
@@ -186,12 +186,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
                 style={[styles.levelBtn, level === l && styles.levelBtnActive]}
                 onPress={() => setLevel(l)}
               >
-                <Text
-                  style={[styles.levelText, level === l && styles.levelTextActive]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                >
+                <Text style={[styles.levelText, level === l && styles.levelTextActive]}>
                   {t('level.' + l)}
                 </Text>
               </TouchableOpacity>
@@ -329,11 +324,12 @@ const styles = StyleSheet.create({
   },
   levelContainer: { flexDirection: 'row', gap: 10, marginTop: 8 },
   levelBtn: {
-    flex: 1, padding: 12, borderRadius: 10,
-    backgroundColor: colors.cardInner, borderWidth: 1, borderColor: colors.borderLight, alignItems: 'center',
+    flex: 1, paddingVertical: 12, paddingHorizontal: 4, borderRadius: 10, minHeight: 48,
+    backgroundColor: colors.cardInner, borderWidth: 1, borderColor: colors.borderLight,
+    alignItems: 'center', justifyContent: 'center',
   },
   levelBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  levelText: { color: colors.textMuted, fontWeight: '600' },
+  levelText: { color: colors.textMuted, fontWeight: '600', fontSize: 13, textAlign: 'center' },
   levelTextActive: { color: colors.onPrimary },
   saveBtn: { marginTop: 24, backgroundColor: colors.primary, padding: 16, borderRadius: radius.lg, alignItems: 'center' },
   saveBtnText: { fontSize: 16, fontWeight: 'bold', color: colors.onPrimary },

@@ -42,7 +42,7 @@ export default function MedalsWall({ medals = [] }) {
                 style={[styles.title, m.unlocked && { color: tint }]}
                 numberOfLines={2}
               >
-                {m.title}
+                {t('medal.' + m.id + '.title')}
               </Text>
             </View>
           );

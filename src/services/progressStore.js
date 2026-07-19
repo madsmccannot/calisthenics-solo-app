@@ -63,18 +63,19 @@ export function getLevelInfo(totalXp) {
   };
 }
 
-// ---------- Títulos ----------
+// ---------- Titles ----------
+// Returns an i18n key; the screens translate it with t().
 const TITLES = [
-  { min: 50, name: 'Titã' },
-  { min: 35, name: 'Lenda' },
-  { min: 20, name: 'Elite' },
-  { min: 10, name: 'Atleta' },
-  { min: 5, name: 'Discípulo' },
-  { min: 1, name: 'Novato' },
+  { min: 50, key: 'title.titan' },
+  { min: 35, key: 'title.legend' },
+  { min: 20, key: 'title.elite' },
+  { min: 10, key: 'title.athlete' },
+  { min: 5, key: 'title.disciple' },
+  { min: 1, key: 'title.novice' },
 ];
 
 export function titleForLevel(level) {
-  return TITLES.find((t) => level >= t.min)?.name || 'Novato';
+  return TITLES.find((t) => level >= t.min)?.key || 'title.novice';
 }
 
 // ---------- Persistência ----------
@@ -300,11 +301,11 @@ export async function advanceSeason() {
   return state.season;
 }
 
-// Rótulo de tier por season: 1-3 numeradas, depois Elite/Master/Legend.
+// Season tier i18n key: 1-3 numbered, then Elite/Master/Legend.
 export function seasonTier(season = 1) {
-  if (season >= 10) return 'Legend';
-  if (season >= 7) return 'Master';
-  if (season >= 4) return 'Elite';
+  if (season >= 10) return 'tier.legend';
+  if (season >= 7) return 'tier.master';
+  if (season >= 4) return 'tier.elite';
   return null;
 }
 

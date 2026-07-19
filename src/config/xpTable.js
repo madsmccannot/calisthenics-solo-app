@@ -1,16 +1,16 @@
-// Configuração declarativa de quanto XP vale cada coisa. Mexer aqui reequilibra
-// a economia sem tocar em lógica.
+// Declarative config of how much XP everything is worth. Tuning happens here,
+// without touching logic.
 
-// Multiplicador de XP por classe de treino (reutiliza profile.level).
-// Classes mais altas têm mais carga -> mais XP por exercício.
+// XP multiplier per training class (reuses profile.level).
+// Higher classes have more load -> more XP per exercise.
 export const CLASS_MULT = {
   Iniciante: 1.0,
   Intermédio: 1.15,
   Avançado: 1.3,
 };
 
-// XP por repetição, por id de exercício (exercícios "reps").
-// Calibrado para dar números limpos com quantidades típicas:
+// XP per rep, by exercise id ("reps" exercises).
+// Calibrated for clean numbers with typical quantities:
 // pushup 2.5 x 12 = 30, squat 1.6 x 15 = 24, burpee 4 x 10 = 40.
 const REP_RATE = {
   pushup_classic: 2.5,
@@ -27,7 +27,7 @@ const REP_RATE = {
 };
 const DEFAULT_REP_RATE = 2.0;
 
-// XP por segundo, por id (exercícios de tempo/isometria).
+// XP per second, by id (time/isometric exercises).
 const TIME_RATE = {
   plank: 0.6,
   side_plank: 0.7,
@@ -40,7 +40,7 @@ const DEFAULT_TIME_RATE = 0.5;
 
 const MIN_XP = 5;
 
-// XP de um único exercício, já com a classe aplicada.
+// XP for a single exercise, with the class multiplier applied.
 export function xpForExercise(ex, className = 'Iniciante') {
   const mult = CLASS_MULT[className] ?? 1;
   const qty = Number(ex?.quantity) || 0;
@@ -52,7 +52,7 @@ export function xpForExercise(ex, className = 'Iniciante') {
   return Math.max(MIN_XP, Math.round(rate * qty * mult));
 }
 
-// Repartição de XP de um treino inteiro -> [{ name, xp }].
+// XP breakdown for a whole workout -> [{ name, xp }].
 export function xpBreakdown(exercises = [], className = 'Iniciante') {
   return exercises.map((ex) => ({
     name: ex.display_name,
@@ -60,13 +60,13 @@ export function xpBreakdown(exercises = [], className = 'Iniciante') {
   }));
 }
 
-// Bónus fixo por terminar o treino.
+// Fixed bonus for finishing the workout.
 export const COMPLETION_BONUS = 25;
 
-// XP de recuperação (dias de descanso não têm exercícios).
+// Recovery XP (rest days have no exercises).
 export const RECOVERY_XP = 40;
 
-// Bónus de streak: cresce com os dias seguidos, com teto.
+// Streak bonus: grows with consecutive days, capped.
 export function streakBonus(streak = 0) {
   return Math.min(streak * 5, 100);
 }
