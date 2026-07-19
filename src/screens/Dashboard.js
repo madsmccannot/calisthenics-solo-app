@@ -5,20 +5,23 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateWorkoutPlan } from '../services/geminiService';
-import { getStreakData, updateStreak } from '../services/localStore';
-import { getProgressSummary, rewardRecovery, markWorkoutMissionForToday } from '../services/progressStore';
+import { getStreakData, updateStreak, getWeightLog } from '../services/localStore';
+import { getProgressSummary, rewardRecovery, markWorkoutMissionForToday, checkMedals } from '../services/progressStore';
 import { RECOVERY_XP } from '../config/xpTable';
 import RecoveryModal from '../components/RecoveryModal';
 import LevelHeader from '../components/LevelHeader';
 import MissionCard from '../components/MissionCard';
+import InfoModal from '../components/InfoModal';
 
 export default function Dashboard({ profile, onStartWorkout }) {
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [streak, setStreak] = useState({ current: 0, best: 0 });
   const [recoveryDay, setRecoveryDay] = useState(null);
   const [summary, setSummary] = useState(null);
   const [missionKey, setMissionKey] = useState(0);
+  const [emptyDayInfo, setEmptyDayInfo] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -41,7 +44,20 @@ export default function Dashboard({ profile, onStartWorkout }) {
 
     const saved = await AsyncStorage.getItem('workoutPlan');
     if (saved) {
-      setDays(JSON.parse(saved));
+      const parsed = JSON.parse(saved);
+      // Repara planos com day_number duplicado (bug antigo da regeneração):
+      // a ordem do array é a verdade, por isso re-derivamos o número pela posição.
+      // Também garante que exercises é sempre um array.
+      const normalized = parsed.map((d, i) => ({
+        ...d,
+        day_number: i + 1,
+        exercises: Array.isArray(d.exercises) ? d.exercises : [],
+      }));
+      const needsFix = parsed.some(
+        (d, i) => d.day_number !== i + 1 || !Array.isArray(d.exercises)
+      );
+      if (needsFix) await AsyncStorage.setItem('workoutPlan', JSON.stringify(normalized));
+      setDays(normalized);
       setLoading(false);
       return;
     }
@@ -53,6 +69,7 @@ export default function Dashboard({ profile, onStartWorkout }) {
 
   const generateFullPlan = async (startD) => {
     setLoading(true);
+    setGenerating(true);
     const plan = [];
     for (let i = 1; i <= 30; i++) {
       const date = new Date(startD);
@@ -68,12 +85,15 @@ export default function Dashboard({ profile, onStartWorkout }) {
       } else {
         const workout = await generateWorkoutPlan(profile, i);
         if (workout) {
-          plan.push({ ...workout, date: date.toISOString(), completed: false });
+          // fixa o day_number: o Gemini às vezes devolve o do exemplo (1)
+          plan.push({ ...workout, day_number: i, date: date.toISOString(), completed: false });
         }
       }
     }
     await AsyncStorage.setItem('workoutPlan', JSON.stringify(plan));
+    await AsyncStorage.setItem('planClass', profile.level); // classe base do plano
     setDays(plan);
+    setGenerating(false);
     setLoading(false);
   };
 
@@ -94,10 +114,19 @@ export default function Dashboard({ profile, onStartWorkout }) {
     // Recuperação também dá um pouco de XP e conta a missão de treino do dia
     await rewardRecovery(RECOVERY_XP);
     await markWorkoutMissionForToday();
+    const weightLog = await getWeightLog();
+    await checkMedals({ streak: streakData, weightLog });
     await refreshProgress();
     setMissionKey((k) => k + 1);
 
     setRecoveryDay(null);
+  };
+
+  const handleMissionClaimed = async () => {
+    const sd = await getStreakData();
+    const weightLog = await getWeightLog();
+    await checkMedals({ streak: sd, weightLog });
+    await refreshProgress();
   };
 
   const getCardStyle = (day) => {
@@ -136,8 +165,12 @@ export default function Dashboard({ profile, onStartWorkout }) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4ade80" />
-        <Text style={styles.loadingText}>A gerar o teu plano de 30 dias...</Text>
-        <Text style={styles.loadingSubtext}>Isto pode demorar 1-2 minutos</Text>
+        {generating && (
+          <>
+            <Text style={styles.loadingText}>A gerar o teu plano de 30 dias...</Text>
+            <Text style={styles.loadingSubtext}>Isto pode demorar 1-2 minutos</Text>
+          </>
+        )}
       </View>
     );
   }
@@ -149,7 +182,7 @@ export default function Dashboard({ profile, onStartWorkout }) {
         <LevelHeader summary={summary} streak={streak.current} />
         <MissionCard
           key={missionKey}
-          onClaimed={() => refreshProgress()}
+          onClaimed={handleMissionClaimed}
         />
         <Text style={styles.title}>O teu Plano de 30 Dias</Text>
         <View style={styles.grid}>
@@ -160,6 +193,10 @@ export default function Dashboard({ profile, onStartWorkout }) {
               onPress={() => {
                 if (day.workout_type === 'Recovery') {
                   setRecoveryDay(day);
+                  return;
+                }
+                if (!day.exercises || day.exercises.length === 0) {
+                  setEmptyDayInfo(true);
                   return;
                 }
                 onStartWorkout(day);
@@ -185,6 +222,15 @@ export default function Dashboard({ profile, onStartWorkout }) {
         visible={!!recoveryDay}
         onDismiss={() => setRecoveryDay(null)}
         onComplete={handleRecoveryDone}
+      />
+
+      <InfoModal
+        visible={emptyDayInfo}
+        emoji="🛠️"
+        title="Dia sem exercícios"
+        message="Este dia ficou vazio numa geração anterior. Vai ao Perfil e aplica a carga novamente para o preencher."
+        buttonText="Entendido"
+        onDismiss={() => setEmptyDayInfo(false)}
       />
     </>
   );

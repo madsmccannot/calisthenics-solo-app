@@ -6,7 +6,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LineChart } from 'react-native-chart-kit';
 import { getStreakData, getWeightLog, addWeightEntry, deleteWeightEntry } from '../services/localStore';
+import { getMedalsStatus } from '../services/progressStore';
 import WeightModal from '../components/WeightModal';
+import MedalsWall from '../components/MedalsWall';
 
 const screenWidth = Dimensions.get('window').width - 32;
 const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -19,6 +21,7 @@ export default function StatsScreen({ profile, activeTab }) {
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [workoutPlan, setWorkoutPlan] = useState([]);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [medals, setMedals] = useState([]);
 
   useEffect(() => {
     if (activeTab === 'stats') {
@@ -42,6 +45,8 @@ export default function StatsScreen({ profile, activeTab }) {
 
     const log = await getWeightLog();
     setWeightLog(log);
+
+    setMedals(await getMedalsStatus());
   };
 
   const handleWeightSave = async (weight) => {
@@ -229,6 +234,9 @@ export default function StatsScreen({ profile, activeTab }) {
           <Text style={styles.statLabel}>Exercícios feitos</Text>
         </View>
       </View>
+
+      {/* Medalhas */}
+      <MedalsWall medals={medals} />
 
       {/* Progresso */}
       <View style={styles.progressCard}>

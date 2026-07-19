@@ -8,8 +8,8 @@ import CompletionScreen from './src/screens/CompletionScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
-import { updateStreak } from './src/services/localStore';
-import { completeWorkout } from './src/services/progressStore';
+import { updateStreak, getWeightLog } from './src/services/localStore';
+import { completeWorkout, checkMedals } from './src/services/progressStore';
 import { xpBreakdown, COMPLETION_BONUS } from './src/config/xpTable';
 import { BackHandler } from 'react-native';
 
@@ -115,25 +115,39 @@ export default function App() {
 
     // Progressão: calcula e credita o XP do treino
     const className = profile.level || 'Iniciante';
-    const breakdown = xpBreakdown(currentWorkout.exercises, className);
+    const workoutExercises = currentWorkout.exercises || [];
+    const breakdown = xpBreakdown(workoutExercises, className);
     const exercisesXp = breakdown.reduce((a, b) => a + b.xp, 0);
-    const reps = currentWorkout.exercises
+    const reps = workoutExercises
       .filter((e) => e.type === 'reps')
       .reduce((a, e) => a + (Number(e.quantity) || 0), 0);
-    const seconds = currentWorkout.exercises
+    const seconds = workoutExercises
       .filter((e) => e.type !== 'reps')
       .reduce((a, e) => a + (Number(e.quantity) || 0), 0);
+
+    // reps por id de exercício (para as medalhas: "1000 flexões", etc.)
+    const repsById = workoutExercises
+      .filter((e) => e.type === 'reps')
+      .reduce((acc, e) => {
+        acc[e.id] = (acc[e.id] || 0) + (Number(e.quantity) || 0);
+        return acc;
+      }, {});
 
     const result = await completeWorkout({
       exercisesXp,
       bonus: COMPLETION_BONUS,
       streak: streakData.current,
-      exerciseCount: currentWorkout.exercises.length,
+      exerciseCount: workoutExercises.length,
       reps,
       seconds,
+      repsById,
     });
 
-    setXpResult({ ...result, breakdown });
+    // medalhas desbloqueadas com este treino
+    const weightLog = await getWeightLog();
+    const newMedals = await checkMedals({ streak: streakData, weightLog });
+
+    setXpResult({ ...result, breakdown, newMedals });
     setCurrentStreak(streakData.current);
     setCompletedWorkout(currentWorkout);
     setCurrentWorkout(null);
@@ -203,7 +217,13 @@ export default function App() {
         <StatsScreen profile={profile} activeTab={activeTab} />
       </View>
       <View style={{ flex: 1, display: activeTab === 'profile' ? 'flex' : 'none' }}>
-        <ProfileScreen profile={profile} onProfileUpdate={setProfile} onReset={handleReset} />
+        <ProfileScreen
+          profile={profile}
+          activeTab={activeTab}
+          onProfileUpdate={setProfile}
+          onReset={handleReset}
+          onPlanChanged={() => setDashboardKey((k) => k + 1)}
+        />
       </View>
       <BottomNav activeTab={activeTab} onTabPress={setActiveTab} />
     </View>

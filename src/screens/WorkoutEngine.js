@@ -17,10 +17,11 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
   const progressAnim = useRef(new Animated.Value(1)).current;
   const currentIndexRef = useRef(0);
 
-  const exercises = workout.exercises;
+  const exercises = workout?.exercises || [];
   const current = exercises[currentIndex];
   const isLast = currentIndex === exercises.length - 1;
-  const isTimeBased = current?.type !== 'reps';
+  // sem current, NÃO é time-based (senão o efeito abaixo lê current.quantity e rebenta)
+  const isTimeBased = !!current && current.type !== 'reps';
   const currentXp = current ? xpForExercise(current, className) : 0;
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
   }, []);
 
   useEffect(() => {
+    if (!current) return; // dia sem exercícios -> não faz nada
     if (phase === 'rest') {
       startTimer(current.rest_seconds, true);
     } else {

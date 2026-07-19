@@ -12,6 +12,8 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack }) 
 
   const leveledUp = xpResult?.leveledUp;
   const total = xpResult?.total ?? 0;
+  const coinsEarned = xpResult?.coinsEarned ?? 0;
+  const newMedals = xpResult?.newMedals ?? [];
   const breakdown = xpResult?.breakdown ?? [];
   const levelInfo = xpResult?.levelInfo;
   const progress = Math.max(0, Math.min(1, levelInfo?.progress ?? 0));
@@ -53,7 +55,29 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack }) 
           <View style={styles.xpTotalBox}>
             <Text style={styles.xpTotalLabel}>XP ganho</Text>
             <Text style={styles.xpTotalValue}>+{total}</Text>
+            {coinsEarned > 0 && (
+              <Text style={styles.coinsEarned}>+{coinsEarned} 🪙</Text>
+            )}
           </View>
+
+          {/* Medalhas desbloqueadas */}
+          {newMedals.length > 0 && (
+            <View style={styles.medalsBox}>
+              <Text style={styles.medalsTitle}>
+                {newMedals.length > 1 ? 'Novas medalhas!' : 'Nova medalha!'}
+              </Text>
+              {newMedals.map((m) => (
+                <View key={m.id} style={styles.medalRow}>
+                  <Text style={styles.medalEmoji}>{m.emoji}</Text>
+                  <View style={styles.medalInfo}>
+                    <Text style={styles.medalName}>{m.title}</Text>
+                    <Text style={styles.medalDesc}>{m.desc}</Text>
+                  </View>
+                  <Text style={styles.medalCoins}>+{m.coins} 🪙</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Level up */}
           {leveledUp && levelInfo && (
@@ -107,7 +131,7 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack }) 
           {/* Stats rápidas */}
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{workout.exercises.length}</Text>
+              <Text style={styles.statNumber}>{workout.exercises?.length || 0}</Text>
               <Text style={styles.statLabel}>Exercícios</Text>
             </View>
             <View style={styles.statBox}>
@@ -153,6 +177,21 @@ const styles = StyleSheet.create({
   },
   xpTotalLabel: { color: colors.textMuted, fontSize: 13, marginBottom: 4 },
   xpTotalValue: { color: colors.gold, fontSize: 48, fontWeight: 'bold' },
+  coinsEarned: { color: colors.gold, fontSize: 15, fontWeight: 'bold', marginTop: 4 },
+  medalsBox: {
+    width: '100%', backgroundColor: colors.card, borderRadius: radius.xl,
+    padding: 16, borderWidth: 1, borderColor: colors.gold, marginBottom: 16,
+  },
+  medalsTitle: {
+    color: colors.gold, fontSize: 15, fontWeight: 'bold',
+    textAlign: 'center', marginBottom: 12,
+  },
+  medalRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  medalEmoji: { fontSize: 30, marginRight: 12 },
+  medalInfo: { flex: 1 },
+  medalName: { color: colors.text, fontSize: 15, fontWeight: 'bold' },
+  medalDesc: { color: colors.textMuted, fontSize: 12, marginTop: 1 },
+  medalCoins: { color: colors.gold, fontSize: 13, fontWeight: 'bold' },
   levelUpBox: {
     alignItems: 'center', backgroundColor: colors.card, borderRadius: radius.xl,
     paddingVertical: 14, paddingHorizontal: 28, borderWidth: 1, borderColor: colors.purple,

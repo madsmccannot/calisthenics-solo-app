@@ -18,6 +18,8 @@ export const colors = {
   green: '#22c55e', // recovery
   gold: '#fbbf24', // XP / moedas / nível
   purple: '#a78bfa', // títulos / raridade
+  bronze: '#cd7f32', // medalha tier bronze
+  silver: '#cbd5e1', // medalha tier prata
 
   // texto
   text: '#ffffff',

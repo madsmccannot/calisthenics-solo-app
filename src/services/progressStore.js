@@ -5,6 +5,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateDailyMissions } from '../config/missions';
 import { streakBonus } from '../config/xpTable';
+import { MEDALS } from '../config/medals';
 
 const GAME_KEY = 'gameState';
 
@@ -30,6 +31,7 @@ const DEFAULT_STATE = {
     totalReps: 0,
     totalSeconds: 0,
     totalXpEarned: 0,
+    repsByExercise: {}, // { exerciseId: reps } — usado pelas medalhas
   },
 };
 
@@ -150,18 +152,26 @@ export async function completeWorkout({
   exerciseCount = 0,
   reps = 0,
   seconds = 0,
+  repsById = {},
 }) {
   const state = await getGameState();
   const before = getLevelInfo(state.xp);
   const sBonus = streakBonus(streak);
   const total = exercisesXp + bonus + sBonus;
+  const coinsEarned = Math.max(5, Math.round((exercisesXp + bonus) / 12));
 
   state.xp += total;
+  state.coins += coinsEarned;
   state.stats.totalXpEarned += total;
   state.stats.totalWorkouts += 1;
   state.stats.totalExercises += exerciseCount;
   state.stats.totalReps += reps;
   state.stats.totalSeconds += seconds;
+
+  // acumula reps por exercício (para medalhas tipo "1000 flexões")
+  for (const [id, n] of Object.entries(repsById)) {
+    state.stats.repsByExercise[id] = (state.stats.repsByExercise[id] || 0) + n;
+  }
 
   ensureMissions(state);
   const wm = state.missions.items.find((i) => i.id === 'workout');
@@ -174,6 +184,7 @@ export async function completeWorkout({
     exercisesXp,
     bonus,
     streakBonus: sBonus,
+    coinsEarned,
     leveledUp: after.level > before.level,
     fromLevel: before.level,
     toLevel: after.level,
@@ -259,4 +270,47 @@ export async function markWorkoutMissionForToday() {
   if (wm) wm.done = true;
   await save(state);
   return state.missions;
+}
+
+// ---------- Medalhas ----------
+function buildMedalContext(state, { streak, weightLog }) {
+  return {
+    stats: state.stats,
+    level: getLevelInfo(state.xp).level,
+    streak: streak || { current: 0, best: 0 },
+    weightLog: weightLog || [],
+  };
+}
+
+// Avalia todas as medalhas ainda por desbloquear. As recém-desbloqueadas são
+// gravadas, dão moedas, e devolvidas para mostrar na UI.
+export async function checkMedals({ streak, weightLog } = {}) {
+  const state = await getGameState();
+  const ctx = buildMedalContext(state, { streak, weightLog });
+  const newly = [];
+  for (const m of MEDALS) {
+    if (state.medals[m.id]) continue;
+    if (m.condition(ctx)) {
+      state.medals[m.id] = new Date().toISOString();
+      state.coins += m.coins;
+      newly.push(m);
+    }
+  }
+  if (newly.length) await save(state);
+  return newly;
+}
+
+// Lista completa de medalhas com o estado de desbloqueio (para a parede).
+export async function getMedalsStatus() {
+  const state = await getGameState();
+  return MEDALS.map((m) => ({
+    id: m.id,
+    emoji: m.emoji,
+    tier: m.tier,
+    title: m.title,
+    desc: m.desc,
+    coins: m.coins,
+    unlocked: !!state.medals[m.id],
+    unlockedAt: state.medals[m.id] || null,
+  }));
 }
