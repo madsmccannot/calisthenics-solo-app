@@ -8,8 +8,8 @@ import Avatar from './Avatar';
 import { CATEGORIES, itemsBySlot } from '../config/shopCatalog';
 import { getLockerState, buyItem, equipItem } from '../services/progressStore';
 
-// Loja + aparência num só ecrã: compra com moedas e equipa. Itens grátis já
-// vêm desbloqueados; comprar equipa logo.
+// Shop + appearance in one screen: buy with coins and equip. Free items are
+// unlocked by default; buying equips right away.
 export default function LockerModal({ visible, onClose, onChanged }) {
   const { t } = useI18n();
   const [locker, setLocker] = useState(null);
@@ -66,7 +66,7 @@ export default function LockerModal({ visible, onClose, onChanged }) {
             <Avatar avatar={locker.avatar} size={120} />
           </View>
 
-          {/* separadores de slot */}
+          {/* slot tabs */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -87,7 +87,7 @@ export default function LockerModal({ visible, onClose, onChanged }) {
 
           {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
-          {/* grelha de itens do slot ativo */}
+          {/* items grid for the active slot */}
           <ScrollView contentContainerStyle={styles.grid}>
             {items.map((item) => {
               const owned = locker.owned.includes(item.id);
@@ -132,7 +132,7 @@ function Swatch({ item }) {
   if (typeof item.value === 'string' && item.value.startsWith('#')) {
     return <View style={[styles.swatch, { backgroundColor: item.value }]} />;
   }
-  // estilos de cabelo (short/mohawk)
+  // hair styles (short/mohawk)
   const label = item.value === 'mohawk' ? '⑄' : '≈';
   return <View style={[styles.swatch, styles.swatchStyle]}><Text style={styles.swatchStyleText}>{label}</Text></View>;
 }

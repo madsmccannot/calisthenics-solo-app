@@ -1,19 +1,23 @@
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-const SYSTEM_PROMPT = `Atua como um Treinador de Calistenia especializado em Treino de Solo (Bodyweight) e Perda de Peso Rápida.
+// Language code -> language name for the prompt, so the AI writes the exercise
+// display names in the app's current language (the id stays the same).
+const LANG_NAMES = { en: 'English', pt: 'Portuguese', es: 'Spanish', fr: 'French', de: 'German' };
 
-RESTRIÇÃO ABSOLUTA: Não sugiras exercícios que requeiram barras, paralelas, pesos ou elásticos. Apenas exercícios de chão/solo.
-OBJETIVO: Criar um plano de 30 dias focado em défice calórico e resistência muscular.
+const SYSTEM_PROMPT = `Act as a Calisthenics coach specialized in solo (bodyweight) training and fast weight loss.
 
-OUTPUT: Responde APENAS em JSON puro, sem markdown, sem backticks, sem texto extra. Segue exatamente esta estrutura:
+HARD CONSTRAINT: Do not suggest exercises that require bars, parallettes, weights or resistance bands. Floor/bodyweight exercises only.
+GOAL: Build workouts focused on a calorie deficit and muscular endurance.
+
+OUTPUT: Reply ONLY in pure JSON, no markdown, no backticks, no extra text. Follow exactly this structure:
 {
   "day_number": 1,
   "workout_type": "HIIT",
   "exercises": [
     {
       "id": "pushup_classic",
-      "display_name": "Flexões Clássicas",
+      "display_name": "Classic Push-ups",
       "type": "reps",
       "quantity": 12,
       "rest_seconds": 30,
@@ -22,12 +26,12 @@ OUTPUT: Responde APENAS em JSON puro, sem markdown, sem backticks, sem texto ext
   ]
 }
 
-LISTA DE EXERCÍCIOS PERMITIDOS (usa apenas estes ids):
+ALLOWED EXERCISES (use only these ids):
 pushup_classic, pushup_diamond, pushup_wide, squat_classic, squat_jump,
 lunge, burpee, mountain_climber, plank, side_plank, superman,
 hollow_body_hold, leg_raise, jumping_jack
 
-ANIMATION FILES disponíveis (mapeia o id ao ficheiro correto):
+ANIMATION FILES (map the id to the correct file):
 pushup_classic → pushup.json
 pushup_diamond → pushup.json
 pushup_wide → pushup.json
@@ -43,50 +47,54 @@ hollow_body_hold → plank.json
 leg_raise → leg_raise.json
 jumping_jack → jumping_jack.json`;
 
+// Keys are the canonical profile.level values (kept as-is; used elsewhere).
 const LEVEL_GUIDANCE = {
   Iniciante:
-    'INTENSIDADE BAIXA. Repetições 8-14 por exercício. Descansos longos (35-45s). ' +
-    'Só variações fáceis (pushup_classic, squat_classic, jumping_jack, plank). Isometrias 20-30s.',
+    'LOW INTENSITY. 8-14 reps per exercise. Long rests (35-45s). ' +
+    'Only easy variations (pushup_classic, squat_classic, jumping_jack, plank). Holds 20-30s.',
   Intermédio:
-    'INTENSIDADE MÉDIA. Repetições 15-22 por exercício. Descansos médios (20-30s). ' +
-    'Inclui variações moderadas (lunge, mountain_climber, leg_raise). Isometrias 30-45s.',
+    'MEDIUM INTENSITY. 15-22 reps per exercise. Medium rests (20-30s). ' +
+    'Include moderate variations (lunge, mountain_climber, leg_raise). Holds 30-45s.',
   Avançado:
-    'INTENSIDADE ALTA. Repetições 22-35 por exercício. Descansos curtos (10-20s). ' +
-    'Usa as variações difíceis (pushup_diamond, squat_jump, burpee, hollow_body_hold). Isometrias 45-70s.',
+    'HIGH INTENSITY. 22-35 reps per exercise. Short rests (10-20s). ' +
+    'Use the hard variations (pushup_diamond, squat_jump, burpee, hollow_body_hold). Holds 45-70s.',
 };
 
-// Foco rotativo por dia, para os treinos NÃO saírem todos iguais.
+// Rotating focus per day, so workouts don't all come out the same.
 const DAILY_FOCUS = [
-  { type: 'Full Body', focus: 'Corpo inteiro — mistura empurrar, pernas e core.' },
-  { type: 'Strength', focus: 'Tren superior — peito, ombros e braços (flexões e as suas variações, prancha).' },
-  { type: 'Strength', focus: 'Pernas e glúteos — agachamentos, afundos e saltos.' },
-  { type: 'Core', focus: 'Core e abdominais — prancha, prancha lateral, hollow body, elevações de pernas, superman.' },
-  { type: 'HIIT', focus: 'HIIT cardio — burpees, mountain climbers, polichinelos, agachamento com salto.' },
-  { type: 'Full Body', focus: 'Corpo inteiro em circuito — alterna grupos musculares.' },
+  { type: 'Full Body', focus: 'Full body — mix push, legs and core.' },
+  { type: 'Strength', focus: 'Upper body — chest, shoulders and arms (push-ups and their variations, plank).' },
+  { type: 'Strength', focus: 'Legs and glutes — squats, lunges and jumps.' },
+  { type: 'Core', focus: 'Core and abs — plank, side plank, hollow body, leg raises, superman.' },
+  { type: 'HIIT', focus: 'HIIT cardio — burpees, mountain climbers, jumping jacks, jump squats.' },
+  { type: 'Full Body', focus: 'Full body circuit — alternate muscle groups.' },
 ];
 
-export async function generateWorkoutPlan(profile, dayNumber = 1, season = 1) {
+export async function generateWorkoutPlan(profile, dayNumber = 1, season = 1, lang = 'en') {
   const guidance = LEVEL_GUIDANCE[profile.level] || LEVEL_GUIDANCE.Iniciante;
   const today = DAILY_FOCUS[(dayNumber - 1) % DAILY_FOCUS.length];
+  const langName = LANG_NAMES[lang] || 'English';
   const seasonRule =
     season > 1
-      ? `\nESTA É A SEASON ${season}: aumenta a dificuldade em relação às seasons anteriores — mais repetições (cerca de +${(season - 1) * 15}%), variações mais difíceis e descansos um pouco mais curtos, SEM deixar de respeitar a regra de carga do nível.`
+      ? `\nTHIS IS SEASON ${season}: increase difficulty vs earlier seasons — more reps (about +${(season - 1) * 15}%), harder variations and slightly shorter rests, WITHOUT breaking the level's load rule.`
       : '';
   const userPrompt = `
-Gera o treino para o Dia ${dayNumber} com estes dados:
-- Peso: ${profile.weight}kg
-- Altura: ${profile.height}cm
-- Nível: ${profile.level}
-- Season: ${season} · Dia do plano: ${dayNumber} de 30
+Generate the workout for Day ${dayNumber} with this data:
+- Weight: ${profile.weight}kg
+- Height: ${profile.height}cm
+- Level: ${profile.level}
+- Season: ${season} · Plan day: ${dayNumber} of 30
 
-FOCO DESTE DIA (obrigatório): ${today.focus}
-Usa "workout_type": "${today.type}".${seasonRule}
+LANGUAGE (mandatory): write every "display_name" in ${langName}. Keep the "id" values exactly as listed.
 
-VARIEDADE (obrigatório): escolhe exercícios adequados a este foco e VARIA em relação a outros dias.
-NÃO repitas sempre a mesma sequência nem os mesmos números de repetições. Varia a ordem, os
-exercícios escolhidos e as quantidades. Inclui 5 a 7 exercícios.
+FOCUS OF THIS DAY (mandatory): ${today.focus}
+Use "workout_type": "${today.type}".${seasonRule}
 
-REGRA DE CARGA (obrigatória, ajusta os campos "quantity" e "rest_seconds" a isto):
+VARIETY (mandatory): pick exercises that fit this focus and VARY from other days.
+Do NOT always repeat the same sequence or rep counts. Vary the order, the chosen
+exercises and the quantities. Include 5 to 7 exercises.
+
+LOAD RULE (mandatory, tune the "quantity" and "rest_seconds" fields to this):
 ${guidance}
 `;
 
@@ -105,43 +113,43 @@ ${guidance}
         generationConfig: {
           temperature: 0.95,
           maxOutputTokens: 2048,
-          responseMimeType: 'application/json', // saída JSON pura, sem markdown
-          thinkingConfig: { thinkingBudget: 0 }, // desliga o "thinking" do 2.5-flash
+          responseMimeType: 'application/json', // pure JSON output, no markdown
+          thinkingConfig: { thinkingBudget: 0 }, // disable 2.5-flash "thinking"
         }
       })
     });
 
     const data = await response.json();
 
-    // Erro da API (quota, chave inválida, 429...) -> devolve o motivo, não crasha
+    // API error (quota, invalid key, 429...) -> return the reason, don't crash
     if (!response.ok || data?.error) {
-      console.error('Gemini erro API', response.status, JSON.stringify(data?.error || data).slice(0, 300));
+      console.error('Gemini API error', response.status, JSON.stringify(data?.error || data).slice(0, 300));
       return null;
     }
 
-    // Parse defensivo: sem parts/text não rebenta, regista o finishReason
+    // Defensive parse: no parts/text won't crash, logs the finishReason
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
       const reason = data?.candidates?.[0]?.finishReason;
-      console.error('Gemini sem texto. finishReason:', reason, JSON.stringify(data).slice(0, 300));
+      console.error('Gemini returned no text. finishReason:', reason, JSON.stringify(data).slice(0, 300));
       return null;
     }
 
     const clean = text.replace(/```json|```/g, '').trim();
     let parsed = JSON.parse(clean);
 
-    // o modelo às vezes embrulha o treino num array [{...}] — desembrulha
+    // the model sometimes wraps the workout in an array [{...}] — unwrap it
     if (Array.isArray(parsed)) parsed = parsed[0];
 
-    // valida a estrutura mínima — sem exercises válidos, trata como falha
+    // validate the minimal structure — no valid exercises means failure
     if (!parsed || !Array.isArray(parsed.exercises) || parsed.exercises.length === 0) {
-      console.error('Gemini JSON sem exercises:', clean.slice(0, 200));
+      console.error('Gemini JSON without exercises:', clean.slice(0, 200));
       return null;
     }
     return parsed;
 
   } catch (error) {
-    console.error('Erro Gemini:', error);
+    console.error('Gemini error:', error);
     return null;
   }
 }

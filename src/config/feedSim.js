@@ -1,10 +1,7 @@
-// Atividade simulada de "outras pessoas" para o Feed. É gerada localmente
-// (a app é solo/offline) e de forma determinística a partir do dia, por isso
-// fica estável durante o dia e muda de dia para dia — dá sensação de vida.
-//
-// FUTURO/ONLINE: quando houver componente online, substituir generateOthersFeed
-// por um fetch real. É o único ponto a trocar — o resto do Feed já mistura
-// "próprio + outros" da mesma forma. Ver src/services/feed.js.
+// Simulated "other people" activity for the Feed. Generated locally (the app is
+// solo/offline) and deterministically from the day, so it's stable during the
+// day and changes day to day — giving a sense of life. Only used as a fallback
+// when there's no Supabase backend (feed.js uses the real feed_events otherwise).
 
 const NAMES = [
   'João', 'Ana', 'Lucas', 'Beatriz', 'Miguel', 'Sofia', 'Rafael', 'Carolina',
@@ -13,13 +10,13 @@ const NAMES = [
 ];
 
 const TEMPLATES = [
-  (n, r) => ({ emoji: '💪', title: `${n} completou o Dia ${5 + Math.floor(r() * 85)}` }),
-  (n, r) => ({ emoji: '🔥', title: `${n} — ${[7, 14, 21, 30, 50][Math.floor(r() * 5)]} dias seguidos` }),
-  (n, r) => ({ emoji: '⭐', title: `${n} chegou ao nível ${2 + Math.floor(r() * 40)}` }),
-  (n, r) => ({ emoji: '🏆', title: `${n} completou a Season ${1 + Math.floor(r() * 5)}` }),
-  (n, r) => ({ emoji: '✊', title: `${n} bateu recorde: ${50 + Math.floor(r() * 150)} flexões` }),
-  (n, r) => ({ emoji: '🥇', title: `${n} desbloqueou "${['30 Treinos', '1000 Flexões', '30 Dias Sem Faltar', 'Atleta'][Math.floor(r() * 4)]}"` }),
-  (n, r) => ({ emoji: '📉', title: `${n} perdeu ${1 + Math.floor(r() * 6)}kg` }),
+  (n, r) => ({ emoji: '💪', title: `${n} completed Day ${5 + Math.floor(r() * 85)}` }),
+  (n, r) => ({ emoji: '🔥', title: `${n} — ${[7, 14, 21, 30, 50][Math.floor(r() * 5)]} days in a row` }),
+  (n, r) => ({ emoji: '⭐', title: `${n} reached level ${2 + Math.floor(r() * 40)}` }),
+  (n, r) => ({ emoji: '🏆', title: `${n} completed Season ${1 + Math.floor(r() * 5)}` }),
+  (n, r) => ({ emoji: '✊', title: `${n} set a record: ${50 + Math.floor(r() * 150)} push-ups` }),
+  (n, r) => ({ emoji: '🥇', title: `${n} unlocked "${['30 Workouts', '1000 Push-ups', '30 Days Without Missing', 'Athlete'][Math.floor(r() * 4)]}"` }),
+  (n, r) => ({ emoji: '📉', title: `${n} lost ${1 + Math.floor(r() * 6)}kg` }),
 ];
 
 function hashStr(s) {
@@ -28,7 +25,7 @@ function hashStr(s) {
   return h;
 }
 
-// PRNG determinístico (mulberry32).
+// Deterministic PRNG (mulberry32).
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
@@ -40,7 +37,7 @@ function mulberry32(seed) {
   };
 }
 
-// ~18 eventos simulados, com timestamps nas últimas ~72h.
+// ~18 simulated events, with timestamps in the last ~72h.
 export function generateOthersFeed(now = Date.now()) {
   const seed = hashStr(new Date(now).toDateString());
   const rnd = mulberry32(seed);

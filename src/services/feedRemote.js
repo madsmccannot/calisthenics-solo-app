@@ -1,7 +1,7 @@
-// FEED ONLINE. Com Supabase configurado, usa a tabela `feed_events` (marcos
-// reais de outros utilizadores, com o nome guardado em cada evento). Sem
-// Supabase, cai no cliente HTTP legado (EXPO_PUBLIC_FEED_API_URL) e, sem isso,
-// o feed.js usa o fallback simulado.
+// ONLINE FEED. With Supabase configured, uses the `feed_events` table (real
+// real milestones from other users, with the name stored in each event). Without
+// Supabase, it falls back to the legacy HTTP client (EXPO_PUBLIC_FEED_API_URL) and, without that,
+// feed.js uses the simulated fallback.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, supabaseEnabled } from './supabase';
@@ -22,7 +22,7 @@ async function currentUid() {
   }
 }
 
-// Marcos de outros. `null` = sem qualquer backend (feed.js decide o simulado).
+// Other people's milestones. `null` = no backend at all (feed.js picks the simulated one).
 export async function fetchOthers(limit = 50) {
   if (supabaseEnabled) {
     try {
@@ -70,7 +70,7 @@ export async function fetchOthers(limit = 50) {
   }
 }
 
-// Marcos DO PRÓPRIO (da nuvem). `null` = sem Supabase (usar o local).
+// The user's OWN milestones (from the cloud). `null` = no Supabase (use local).
 export async function fetchOwn(limit = 50) {
   if (!supabaseEnabled) return null;
   try {
@@ -96,7 +96,7 @@ export async function fetchOwn(limit = 50) {
   }
 }
 
-// Publica um marco do próprio (fire-and-forget).
+// Publishes one of the user's milestones (fire-and-forget).
 export async function publishEvent(item) {
   if (supabaseEnabled) {
     try {
@@ -132,6 +132,6 @@ export async function publishEvent(item) {
       }),
     });
   } catch {
-    // offline / erro
+    // offline / error
   }
 }

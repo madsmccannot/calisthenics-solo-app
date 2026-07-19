@@ -1,31 +1,31 @@
-// Regeneração seletiva do plano quando o utilizador muda de classe de treino.
-// Só toca em dias FUTUROS, ainda não concluídos e que não sejam de recuperação
-// — dias já feitos e dias de descanso ficam intactos.
+// Selective plan regeneration when the user changes training class, plus full
+// season generation. Only touches days that are not completed and not recovery
+// — completed days and rest days stay intact.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateWorkoutPlan } from './geminiService';
 import { scheduleSync } from './cloudSync';
 
 const PLAN_KEY = 'workoutPlan';
-const PLAN_CLASS_KEY = 'planClass'; // classe com que os treinos do plano foram gerados
+const PLAN_CLASS_KEY = 'planClass'; // class the plan's workouts were generated with
 const PLAN_START_KEY = 'planStartDate';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Gera um treino com 1 nova tentativa (dodges rate-limit / falhas pontuais).
-async function generateWithRetry(profile, dayNumber, season) {
-  let w = await generateWorkoutPlan(profile, dayNumber, season);
+// Generates a workout with 1 retry (dodges rate-limit / one-off failures).
+async function generateWithRetry(profile, dayNumber, season, lang) {
+  let w = await generateWorkoutPlan(profile, dayNumber, season, lang);
   if (!w) {
     await sleep(4000);
-    w = await generateWorkoutPlan(profile, dayNumber, season);
+    w = await generateWorkoutPlan(profile, dayNumber, season, lang);
   }
   return w;
 }
 
-// Gera o plano completo de uma season (30 dias), ancorado a `startDate`.
-// Recovery a cada 7º dia. Dias que a IA falhar ficam vazios (o Dashboard avisa).
-// Garante SEMPRE 30 dias e grava plano + data de início + classe.
-export async function generateSeasonPlan(profile, season = 1, startDate = new Date()) {
+// Generates a full season plan (30 days), anchored to `startDate`.
+// Recovery every 7th day. Days the AI fails on stay empty (Dashboard warns).
+// ALWAYS returns 30 days and saves plan + start date + class.
+export async function generateSeasonPlan(profile, season = 1, startDate = new Date(), lang = 'en') {
   const startD = new Date(startDate);
   startD.setHours(0, 0, 0, 0);
 
@@ -39,11 +39,11 @@ export async function generateSeasonPlan(profile, season = 1, startDate = new Da
       plan.push({ day_number: i, date: iso, workout_type: 'Recovery', exercises: [], completed: false });
       continue;
     }
-    const w = await generateWithRetry(profile, i, season);
+    const w = await generateWithRetry(profile, i, season, lang);
     if (w) {
       plan.push({ ...w, day_number: i, date: iso, completed: false });
     } else {
-      // placeholder — mantém sempre 30 dias; o utilizador pode reaplicar a carga
+      // placeholder — always keeps 30 days; the user can re-apply the load
       plan.push({ day_number: i, date: iso, workout_type: 'Strength', exercises: [], completed: false });
     }
     await sleep(1200);
@@ -64,14 +64,14 @@ export async function setPlanClass(level) {
   if (level) await AsyncStorage.setItem(PLAN_CLASS_KEY, level);
 }
 
-// Um dia é regenerável se ainda não foi feito e não é de recuperação.
-// Não filtramos por data: na app qualquer dia incompleto é treinável (basta
-// tocar no cartão), mesmo que a data já tenha passado.
+// A day is regenerable if it's not done yet and not a recovery day.
+// We don't filter by date: in the app any incomplete day is trainable (just tap
+// the card), even if its date has already passed.
 function isRegenerable(day) {
   return !day.completed && day.workout_type !== 'Recovery';
 }
 
-// Quantos dias seriam regerados (para decidir se vale a pena perguntar).
+// How many days would be regenerated (to decide whether to even ask).
 export async function getRegenerableCount() {
   try {
     const saved = await AsyncStorage.getItem(PLAN_KEY);
@@ -83,7 +83,7 @@ export async function getRegenerableCount() {
   }
 }
 
-// Diagnóstico do plano — para perceber porque a regeneração não aparece.
+// Plan diagnostics — to understand why regeneration doesn't show up.
 export async function getPlanDiagnostics() {
   try {
     const saved = await AsyncStorage.getItem(PLAN_KEY);
@@ -101,9 +101,9 @@ export async function getPlanDiagnostics() {
   }
 }
 
-// Regenera os dias elegíveis com o novo perfil (nova classe/carga).
-// Devolve { changed } — quantos dias foram efetivamente substituídos.
-export async function regenerateFuturePlan(profile) {
+// Regenerates the eligible days with the new profile (new class/load) and
+// language. Returns { changed } — how many days were actually replaced.
+export async function regenerateFuturePlan(profile, lang = 'en') {
   const saved = await AsyncStorage.getItem(PLAN_KEY);
   if (!saved) return { changed: 0 };
 
@@ -114,22 +114,22 @@ export async function regenerateFuturePlan(profile) {
   let changed = 0;
   for (const day of plan) {
     if (isRegenerable(day)) {
-      let workout = await generateWorkoutPlan(profile, day.day_number);
+      let workout = await generateWorkoutPlan(profile, day.day_number, 1, lang);
       if (!workout) {
-        // provável rate-limit: espera e tenta uma segunda vez
+        // likely rate-limit: wait and try a second time
         await sleep(5000);
-        workout = await generateWorkoutPlan(profile, day.day_number);
+        workout = await generateWorkoutPlan(profile, day.day_number, 1, lang);
       }
       if (workout) {
-        // fixa o day_number/date do dia original — o Gemini devolve o seu próprio
-        // day_number (muitas vezes o do exemplo, 1) e isso duplicava chaves.
+        // pin the original day_number/date — Gemini returns its own day_number
+        // (often the example's, 1), which duplicated keys.
         updated.push({ ...workout, day_number: day.day_number, date: day.date, completed: false });
         changed += 1;
-        await sleep(1500); // espaça as chamadas para não bater no limite
+        await sleep(1500); // space out calls to avoid the rate limit
         continue;
       }
     }
-    updated.push(day); // falha da IA ou dia protegido -> mantém o original
+    updated.push(day); // AI failure or protected day -> keep the original
   }
 
   await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(updated));

@@ -1,8 +1,8 @@
-// Sincronização local <-> nuvem (Supabase). Modelo offline-first:
-//   - a app continua a ler/escrever no AsyncStorage como sempre (funciona offline)
-//   - depois de cada mudança, empurra um snapshot para a nuvem (debounced)
-//   - ao logar: se a conta já tem dados -> puxa; se não -> empurra (migração)
-// Estratégia de conflito: last-write-wins (simples; 1 utilizador por conta).
+// Local <-> cloud sync (Supabase). Offline-first model:
+//   - the app keeps reading/writing AsyncStorage as always (works offline)
+//   - after each change, pushes a snapshot to the cloud (debounced)
+//   - on login: if the account already has data -> pull; if not -> push (migration)
+// Conflict strategy: last-write-wins (simple; 1 user per account).
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, supabaseEnabled } from './supabase';
@@ -15,7 +15,7 @@ const K = {
   streak: 'streakData',
   weight: 'weightLog',
 };
-const OWNER_KEY = 'localOwnerId'; // de que conta são os dados locais
+const OWNER_KEY = 'localOwnerId'; // which account the local data belongs to
 
 async function getLocalOwner() {
   return AsyncStorage.getItem(OWNER_KEY);
@@ -40,13 +40,13 @@ export async function setDisplayName(name) {
     try {
       await supabase.from('profiles').update({ display_name: name }).eq('id', currentUserId);
     } catch {
-      /* offline — vai na próxima sincronização */
+      /* offline — goes on the next sync */
     }
   }
 }
 
-// Reclama um nome de utilizador (verifica unicidade no servidor).
-// Devolve { ok } ou { ok:false, reason:'taken'|'error'|'offline' }.
+// Claims a username (checks uniqueness on the server).
+// Returns { ok } or { ok:false, reason:'taken'|'error'|'offline' }.
 export async function claimUsername(name) {
   const trimmed = (name || '').trim();
   if (!trimmed) return { ok: false, reason: 'error' };
@@ -99,7 +99,7 @@ async function readLocal() {
   };
 }
 
-// ── empurra o estado local para a nuvem ──────────────────────────────────
+// ── push the local state to the cloud ─────────────────────────────────────
 export async function pushSnapshot() {
   if (!supabaseEnabled || !currentUserId) return;
   const uid = currentUserId;
@@ -147,7 +147,7 @@ export async function pushSnapshot() {
         last_completed_date: d.streak.lastCompletedDate || null,
       });
     }
-    // peso: substitui tudo (simples e correto)
+    // weight: replace everything (simple and correct)
     await supabase.from('weight_log').delete().eq('user_id', uid);
     if (Array.isArray(d.weight) && d.weight.length) {
       await supabase.from('weight_log').insert(
@@ -155,11 +155,11 @@ export async function pushSnapshot() {
       );
     }
   } catch {
-    // offline / erro -> a próxima sincronização envia o estado mais recente
+    // offline / error -> the next sync sends the latest state
   }
 }
 
-// ── puxa o estado da nuvem para local ────────────────────────────────────
+// ── pull the state from the cloud into local ──────────────────────────────
 export async function pullSnapshot() {
   if (!supabaseEnabled || !currentUserId) return;
   const uid = currentUserId;
@@ -213,7 +213,7 @@ export async function pullSnapshot() {
       await AsyncStorage.setItem('displayName', prof.data.display_name);
     }
   } catch {
-    // offline / erro -> fica com o que tem em local
+    // offline / error -> keep whatever is in local
   }
 }
 
@@ -229,35 +229,35 @@ async function cloudHasData() {
   }
 }
 
-// Autenticação FRESCA (o utilizador acabou de registar ou entrar). Determinístico:
-// o estado local passa a refletir EXATAMENTE a conta.
-//   - registo (isNew): limpa o local -> conta começa vazia (SetupScreen)
-//   - login: limpa o local e puxa os dados da conta
-// Não é chamado no restauro de sessão (reabrir a app) -> aí mantém-se o local
+// FRESH auth (the user just registered or signed in). Deterministic:
+// the local state now reflects the account EXACTLY.
+//   - register (isNew): clear local -> account starts empty (SetupScreen)
+//   - login: clear local and pull the account data
+// Not called on session restore (reopening the app) -> there local is kept
 // (offline-first).
 export async function freshAuthSync(userId, isNew) {
   if (!supabaseEnabled) return;
   currentUserId = userId;
   await clearLocal();
-  if (!isNew) await pullSnapshot(); // login traz os dados da conta
+  if (!isNew) await pullSnapshot(); // login brings the account data
   await setLocalOwner(userId);
 }
 
-// Empurra debounced (chamado após mudanças locais).
+// Debounced push (called after local changes).
 export function scheduleSync() {
   if (!supabaseEnabled || !currentUserId) return;
   clearTimeout(timer);
   timer = setTimeout(() => { pushSnapshot(); }, 2500);
 }
 
-// Empurra já (ex: app a ir para background).
+// Push now (e.g. app going to background).
 export async function flushSync() {
   if (!supabaseEnabled || !currentUserId) return;
   clearTimeout(timer);
   await pushSnapshot();
 }
 
-// Limpa os dados da conta na nuvem (usado pelo "Resetar Tudo"). Não apaga a conta.
+// Clears the account's cloud data (used by "Reset Everything"). Does not delete the account.
 export async function resetCloud() {
   if (!supabaseEnabled || !currentUserId) return;
   const uid = currentUserId;
@@ -273,6 +273,6 @@ export async function resetCloud() {
       current: 0, best: 0, last_completed_date: null,
     }).eq('user_id', uid);
   } catch {
-    // offline / erro — fica para outra altura
+    // offline / error — try again later
   }
 }

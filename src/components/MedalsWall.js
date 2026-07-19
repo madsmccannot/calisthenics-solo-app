@@ -9,8 +9,8 @@ const TIER_COLOR = {
   gold: colors.gold,
 };
 
-// Grelha de medalhas. As desbloqueadas aparecem a cor do tier; as bloqueadas
-// ficam esbatidas com cadeado. `medals` vem de progressStore.getMedalsStatus().
+// Medal grid. Unlocked ones show in the tier color; locked ones are
+// dimmed with a lock. `medals` comes from progressStore.getMedalsStatus().
 export default function MedalsWall({ medals = [] }) {
   const { t } = useI18n();
   const unlockedCount = medals.filter((m) => m.unlocked).length;

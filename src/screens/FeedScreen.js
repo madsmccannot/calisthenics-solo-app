@@ -6,7 +6,7 @@ import Avatar from '../components/Avatar';
 import { getFeed } from '../services/feed';
 import { getAvatar } from '../services/progressStore';
 
-// Cores estáveis para os avatares dos "outros" (a partir do nome).
+// Stable colors for the "others" avatars (derived from the name).
 const OTHER_COLORS = ['#3b82f6', '#f97316', '#a78bfa', '#22c55e', '#ef4444', '#fbbf24'];
 function colorFor(name) {
   let h = 0;

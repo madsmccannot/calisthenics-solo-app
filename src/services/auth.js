@@ -1,5 +1,5 @@
-// Camada de autenticação (email + password por agora; Google/Apple ligam depois
-// quando os providers estiverem configurados no Supabase).
+// Auth layer (email + password for now; Google/Apple wired later
+// when the providers are configured in Supabase).
 
 import { supabase, supabaseEnabled } from './supabase';
 
@@ -20,12 +20,12 @@ export function passwordStrong(pw) {
 
 export async function signUp(email, password) {
   const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
-  // Se o Supabase exigir confirmação de email, data.session vem null.
+  // If Supabase requires email confirmation, data.session is null.
   return { session: data?.session ?? null, needsConfirmation: !data?.session && !error, error };
 }
 
-// Login por email OU nome de utilizador. Se não for email, resolve o email a
-// partir do nome (via RPC no servidor) e depois entra com password.
+// Login by email OR username. If it's not an email, resolve the email
+// from the name (via a server RPC) and then sign in with the password.
 export async function signInWithIdentifier(identifier, password) {
   let email = (identifier || '').trim();
   if (!email.includes('@')) {
@@ -49,7 +49,7 @@ export async function getSession() {
   return data?.session ?? null;
 }
 
-// Subscreve mudanças de sessão (login/logout/refresh). Devolve unsubscribe.
+// Subscribes to session changes (login/logout/refresh). Returns unsubscribe.
 export function onAuthChange(cb) {
   if (!supabaseEnabled) return () => {};
   const { data } = supabase.auth.onAuthStateChange((_event, session) => cb(session));

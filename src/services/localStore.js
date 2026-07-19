@@ -5,8 +5,8 @@ const STREAK_KEY = 'streakData';
 const WEIGHT_LOG_KEY = 'weightLog';
 const CLIENT_ID_KEY = 'clientId';
 
-// Id anónimo e persistente do dispositivo — usado para publicar os marcos do
-// utilizador no feed online (o backend associa-o a um nome/perfil).
+// Anonymous, persistent device id — used to publish the user's milestones to
+// the online feed (the backend links it to a name/profile).
 export async function getClientId() {
   try {
     let id = await AsyncStorage.getItem(CLIENT_ID_KEY);
@@ -74,11 +74,11 @@ export async function addWeightEntry(weight) {
     const log = await getWeightLog();
     const today = new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
     
-    // Substitui entrada do mesmo dia se já existir
+    // Replace an entry from the same day if one already exists
     const filtered = log.filter((e) => e.date !== today);
     const updated = [...filtered, { date: today, weight: parseFloat(weight) }];
     
-    // Mantém só as últimas 8 entradas
+    // Keep only the last 8 entries
     const trimmed = updated.slice(-8);
     await AsyncStorage.setItem(WEIGHT_LOG_KEY, JSON.stringify(trimmed));
     scheduleSync();

@@ -16,7 +16,7 @@ import MissionCard from '../components/MissionCard';
 import InfoModal from '../components/InfoModal';
 
 export default function Dashboard({ profile, onStartWorkout }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -45,9 +45,9 @@ export default function Dashboard({ profile, onStartWorkout }) {
     const saved = await AsyncStorage.getItem('workoutPlan');
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Repara planos com day_number duplicado (bug antigo da regeneração):
-      // a ordem do array é a verdade, por isso re-derivamos o número pela posição.
-      // Também garante que exercises é sempre um array.
+      // Repairs plans with duplicate day_number (old regeneration bug):
+      // the array order is the truth, so we re-derive the number from position.
+      // Also ensures exercises is always an array.
       const normalized = parsed.map((d, i) => ({
         ...d,
         day_number: i + 1,
@@ -62,10 +62,10 @@ export default function Dashboard({ profile, onStartWorkout }) {
       return;
     }
 
-    // sem plano -> gera a season atual, ancorada a hoje
+    // no plan -> generate the current season, anchored to today
     setLoading(true);
     setGenerating(true);
-    const plan = await generateSeasonPlan(profile, s, new Date());
+    const plan = await generateSeasonPlan(profile, s, new Date(), lang);
     setDays(plan);
     setGenerating(false);
     setLoading(false);
@@ -85,11 +85,11 @@ export default function Dashboard({ profile, onStartWorkout }) {
     const streakData = await updateStreak();
     setStreak(streakData);
 
-    // Recuperação também dá um pouco de XP e conta a missão de treino do dia
+    // Recovery also gives a bit of XP and counts the day\x27s workout mission
     await rewardRecovery(RECOVERY_XP);
     await markWorkoutMissionForToday();
     const weightLog = await getWeightLog();
-    await checkMedals({ streak: streakData, weightLog });
+    await checkMedals({ streak: streakData, weightLog, t });
     await refreshProgress();
     setMissionKey((k) => k + 1);
 
@@ -99,12 +99,12 @@ export default function Dashboard({ profile, onStartWorkout }) {
   const handleMissionClaimed = async () => {
     const sd = await getStreakData();
     const weightLog = await getWeightLog();
-    await checkMedals({ streak: sd, weightLog });
+    await checkMedals({ streak: sd, weightLog, t });
     await refreshProgress();
   };
 
-  // O "dia atual" é o primeiro por fazer (não de recuperação). Como o plano é
-  // ao teu ritmo, não há dias "falhados" — só concluídos, atual e por fazer.
+  // The "current day" is the first not-done one (not recovery). Since the plan is
+  // self-paced, there are no "missed" days — only done, current and to-do.
   const currentDay = days.find((d) => !d.completed && d.workout_type !== 'Recovery');
 
   const getCardStyle = (day) => {

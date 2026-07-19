@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import { colors, radius } from '../theme';
 import { useI18n } from '../i18n/I18nContext';
 
-// Cabeçalho de progressão no topo do Dashboard: nível, título, barra de XP,
-// streak e moedas. `summary` vem de progressStore.getProgressSummary().
+// Progression header at the top of the Dashboard: level, title, XP bar, streak
+// and coins. `summary` comes from progressStore.getProgressSummary().
 export default function LevelHeader({ summary, streak = 0 }) {
   const { t } = useI18n();
   const fillAnim = useRef(new Animated.Value(0)).current;

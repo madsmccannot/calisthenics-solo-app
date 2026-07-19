@@ -32,11 +32,11 @@ export default function AuthScreen({ onAuthed }) {
         const { session, needsConfirmation, error } = await signUp(email, password);
         if (error) setError(t(friendlyAuthError(error)));
         else if (needsConfirmation) setNotice(t('auth.confirmEmail'));
-        else if (session) onAuthed(session, true); // registo -> conta nova (nome vem depois)
+        else if (session) onAuthed(session, true); // register -> new account (name comes later)
       } else {
         const { session, error } = await signInWithIdentifier(email, password);
         if (error) setError(t(friendlyAuthError(error)));
-        else if (session) onAuthed(session, false); // login -> puxa dados da conta
+        else if (session) onAuthed(session, false); // login -> pulls the account data
       }
     } catch (e) {
       setError(t('auth.errGeneric'));

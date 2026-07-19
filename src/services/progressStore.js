@@ -1,6 +1,6 @@
-// Fonte de verdade da progressão: XP, nível, moedas, missões, medalhas,
-// avatar, season e stats vivem todos aqui, numa única key `gameState`.
-// Toda a gamificação pendura neste serviço.
+// Source of truth for progression: XP, level, coins, missions, medals, avatar,
+// season and stats all live here, under a single `gameState` key.
+// The whole gamification layer hangs off this service.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateDailyMissions } from '../config/missions';
@@ -14,10 +14,10 @@ const GAME_KEY = 'gameState';
 
 const DEFAULT_STATE = {
   version: 1,
-  xp: 0, // XP total acumulado (o nível é derivado disto)
+  xp: 0, // total accumulated XP (level is derived from this)
   coins: 0,
   season: 1,
-  medals: {}, // { medalId: unlockedAtISO } — usado a partir da Fase 2
+  medals: {}, // { medalId: unlockedAtISO }
   avatar: {
     skin: 'default',
     hair: 'none',
@@ -26,27 +26,27 @@ const DEFAULT_STATE = {
     frame: 'none',
     theme: 'default',
   },
-  ownedItems: [], // compras na loja — Fase 3
+  ownedItems: [], // shop purchases
   missions: null, // { date, items:[...], claimed }
-  feedEvents: [], // marcos do próprio utilizador para o Feed (mais recente primeiro)
+  feedEvents: [], // the user's own Feed milestones (most recent first)
   stats: {
     totalWorkouts: 0,
     totalExercises: 0,
     totalReps: 0,
     totalSeconds: 0,
     totalXpEarned: 0,
-    repsByExercise: {}, // { exerciseId: reps } — usado pelas medalhas
+    repsByExercise: {}, // { exerciseId: reps } — used by medals
   },
 };
 
-// ---------- Curva de XP ----------
-// XP necessário para subir DE `level` para level+1. Cresce linearmente.
-// 125 x nível bate certo com o exemplo do dono (nível 8 -> 1000 para o 9).
+// ---------- XP curve ----------
+// XP needed to go FROM `level` to level+1. Grows linearly.
+// 125 x level fits the owner's example (level 8 -> 1000 to reach 9).
 export function xpForLevelUp(level) {
   return 125 * level;
 }
 
-// Dado o XP total, devolve o nível e o progresso dentro dele.
+// Given the total XP, returns the level and the progress within it.
 export function getLevelInfo(totalXp) {
   let level = 1;
   let remaining = Math.max(0, totalXp);
@@ -78,12 +78,12 @@ export function titleForLevel(level) {
   return TITLES.find((t) => level >= t.min)?.key || 'title.novice';
 }
 
-// ---------- Persistência ----------
+// ---------- Persistence ----------
 export async function getGameState() {
   try {
     const saved = await AsyncStorage.getItem(GAME_KEY);
     if (!saved) return structuredCopy(DEFAULT_STATE);
-    // merge com defaults para tolerar estados antigos sem campos novos
+    // merge with defaults to tolerate old states missing new fields
     const parsed = JSON.parse(saved);
     return {
       ...structuredCopy(DEFAULT_STATE),
@@ -98,7 +98,7 @@ export async function getGameState() {
 
 async function save(state) {
   await AsyncStorage.setItem(GAME_KEY, JSON.stringify(state));
-  scheduleSync(); // espelha para a nuvem (debounced; no-op se offline/sem conta)
+  scheduleSync(); // mirror to the cloud (debounced; no-op if offline/no account)
   return state;
 }
 
@@ -110,7 +110,7 @@ export function todayKey() {
   return new Date().toDateString();
 }
 
-// ---------- Resumo para o header do Dashboard ----------
+// ---------- Summary for the Dashboard header ----------
 export async function getProgressSummary() {
   const state = await getGameState();
   const info = getLevelInfo(state.xp);
@@ -124,7 +124,7 @@ export async function getProgressSummary() {
   };
 }
 
-// ---------- XP e moedas ----------
+// ---------- XP and coins ----------
 export async function addXp(amount) {
   const state = await getGameState();
   const before = getLevelInfo(state.xp);
@@ -149,8 +149,8 @@ export async function addCoins(amount) {
   return state.coins;
 }
 
-// Fecha um treino: soma XP (exercícios + bónus + streak), regista stats e
-// marca a missão de treino como feita. Uma só leitura/escrita.
+// Closes a workout: adds XP (exercises + bonus + streak), records stats and
+// marks the workout mission as done. A single read/write.
 export async function completeWorkout({
   exercisesXp = 0,
   bonus = 0,
@@ -174,7 +174,7 @@ export async function completeWorkout({
   state.stats.totalReps += reps;
   state.stats.totalSeconds += seconds;
 
-  // acumula reps por exercício (para medalhas tipo "1000 flexões")
+  // accumulate reps per exercise (for medals like "1000 push-ups")
   for (const [id, n] of Object.entries(repsById)) {
     state.stats.repsByExercise[id] = (state.stats.repsByExercise[id] || 0) + n;
   }
@@ -200,7 +200,7 @@ export async function completeWorkout({
   };
 }
 
-// ---------- Missões ----------
+// ---------- Missions ----------
 function missionsValid(m) {
   return (
     m &&
@@ -235,7 +235,7 @@ export async function toggleMission(id) {
   return state.missions;
 }
 
-// Reclama a recompensa das missões diárias (só se todas completas).
+// Claims the daily missions reward (only if all are complete).
 export async function claimMissions() {
   const state = await getGameState();
   ensureMissions(state);
@@ -262,12 +262,12 @@ export async function claimMissions() {
   };
 }
 
-// XP simples (usado pelos dias de recuperação).
+// Simple XP (used by recovery days).
 export async function rewardRecovery(amount) {
   return addXp(amount);
 }
 
-// ---------- Feed (marcos do próprio) ----------
+// ---------- Feed (the user's own milestones) ----------
 function pushFeed(state, event) {
   const item = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -309,8 +309,8 @@ export function seasonTier(season = 1) {
   return null;
 }
 
-// Marca a missão de treino do dia como feita sem creditar XP de treino
-// (usado quando um dia de recuperação é concluído).
+// Marks the day's workout mission as done without crediting workout XP
+// (used when a recovery day is completed).
 export async function markWorkoutMissionForToday() {
   const state = await getGameState();
   ensureMissions(state);
@@ -320,7 +320,7 @@ export async function markWorkoutMissionForToday() {
   return state.missions;
 }
 
-// ---------- Medalhas ----------
+// ---------- Medals ----------
 function buildMedalContext(state, { streak, weightLog }) {
   return {
     stats: state.stats,
@@ -330,9 +330,11 @@ function buildMedalContext(state, { streak, weightLog }) {
   };
 }
 
-// Avalia todas as medalhas ainda por desbloquear. As recém-desbloqueadas são
-// gravadas, dão moedas, e devolvidas para mostrar na UI.
-export async function checkMedals({ streak, weightLog } = {}) {
+// Evaluates all medals not yet unlocked. Newly unlocked ones are saved, grant
+// coins, and are returned to show in the UI.
+// `t` is the translator (optional): the medal's feed event is created in the
+// user's current language at unlock time.
+export async function checkMedals({ streak, weightLog, t } = {}) {
   const state = await getGameState();
   const ctx = buildMedalContext(state, { streak, weightLog });
   const newly = [];
@@ -342,19 +344,20 @@ export async function checkMedals({ streak, weightLog } = {}) {
       state.medals[m.id] = new Date().toISOString();
       state.coins += m.coins;
       newly.push(m);
-      pushFeed(state, { emoji: m.emoji, title: `Medalha: ${m.title}` });
+      const title = t ? t('medal.' + m.id + '.title') : m.id;
+      pushFeed(state, { emoji: m.emoji, title });
     }
   }
   if (newly.length) await save(state);
   return newly;
 }
 
-// ---------- Loja / Avatar ----------
+// ---------- Shop / Avatar ----------
 function ownedSet(state) {
   return new Set([...DEFAULT_OWNED, ...(state.ownedItems || [])]);
 }
 
-// Normaliza o avatar: cada slot -> id válido e possuído, senão o item grátis.
+// Normalizes the avatar: each slot -> a valid owned id, else the free item.
 function normalizeAvatar(avatar = {}, owned) {
   const out = {};
   for (const slot of SLOTS) {
@@ -365,7 +368,7 @@ function normalizeAvatar(avatar = {}, owned) {
   return out;
 }
 
-// Estado para o ecrã de aparência/loja.
+// State for the appearance/shop screen.
 export async function getLockerState() {
   const state = await getGameState();
   const owned = ownedSet(state);
@@ -376,7 +379,7 @@ export async function getLockerState() {
   };
 }
 
-// Só o avatar normalizado (para desenhar em qualquer sítio).
+// Just the normalized avatar (to draw anywhere).
 export async function getAvatar() {
   const state = await getGameState();
   return normalizeAvatar(state.avatar, ownedSet(state));
@@ -390,7 +393,7 @@ export async function buyItem(itemId) {
   if (state.coins < item.cost) return { ok: false, reason: 'coins', coins: state.coins };
   state.coins -= item.cost;
   state.ownedItems = Array.from(new Set([...(state.ownedItems || []), itemId]));
-  // compra equipa logo
+  // buying equips right away
   state.avatar = { ...normalizeAvatar(state.avatar, ownedSet(state)), [item.slot]: itemId };
   await save(state);
   return { ok: true, coins: state.coins };
@@ -405,15 +408,13 @@ export async function equipItem(slot, itemId) {
   return state.avatar;
 }
 
-// Lista completa de medalhas com o estado de desbloqueio (para a parede).
+// Full list of medals with their unlock state (for the wall).
 export async function getMedalsStatus() {
   const state = await getGameState();
   return MEDALS.map((m) => ({
     id: m.id,
     emoji: m.emoji,
     tier: m.tier,
-    title: m.title,
-    desc: m.desc,
     coins: m.coins,
     unlocked: !!state.medals[m.id],
     unlockedAt: state.medals[m.id] || null,

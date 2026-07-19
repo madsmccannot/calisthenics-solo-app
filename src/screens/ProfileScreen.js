@@ -92,7 +92,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
     const updated = { weight, height, level };
     await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
     onProfileUpdate(updated);
-    const { changed } = await regenerateFuturePlan(updated);
+    const { changed } = await regenerateFuturePlan(updated, lang);
     setPlanClass(level);
     setRegenCount(await getRegenerableCount());
     setRegenerating(false);

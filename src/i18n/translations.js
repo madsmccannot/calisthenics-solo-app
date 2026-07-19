@@ -260,6 +260,10 @@ export const translations = {
     'medal.weight_5kg.desc': 'Lose 5kg since your first log',
     'medal.pushups_1000.title': '1000 Push-ups',
     'medal.pushups_1000.desc': 'Accumulate 1000 push-ups total',
+    'feed.evWorkout': 'Completed Day {n}',
+    'feed.evLevelUp': 'Reached level {n}',
+    'feed.evStreak': '{n} days in a row',
+    'feed.evSeason': 'Season {n} complete!',
   },
 
   pt: {
@@ -506,6 +510,10 @@ export const translations = {
     'medal.weight_5kg.desc': 'Perde 5kg desde o primeiro registo',
     'medal.pushups_1000.title': '1000 Flexões',
     'medal.pushups_1000.desc': 'Acumula 1000 flexões no total',
+    'feed.evWorkout': 'Completaste o Dia {n}',
+    'feed.evLevelUp': 'Subiste ao nível {n}',
+    'feed.evStreak': '{n} dias seguidos',
+    'feed.evSeason': 'Season {n} completa!',
   },
 
   es: {
@@ -752,6 +760,10 @@ export const translations = {
     'medal.weight_5kg.desc': 'Pierde 5kg desde tu primer registro',
     'medal.pushups_1000.title': '1000 Flexiones',
     'medal.pushups_1000.desc': 'Acumula 1000 flexiones en total',
+    'feed.evWorkout': 'Completaste el Día {n}',
+    'feed.evLevelUp': 'Subiste al nivel {n}',
+    'feed.evStreak': '{n} días seguidos',
+    'feed.evSeason': '¡Season {n} completada!',
   },
 
   fr: {
@@ -998,6 +1010,10 @@ export const translations = {
     'medal.weight_5kg.desc': 'Perds 5kg depuis ton premier relevé',
     'medal.pushups_1000.title': '1000 Pompes',
     'medal.pushups_1000.desc': 'Cumule 1000 pompes au total',
+    'feed.evWorkout': 'Jour {n} terminé',
+    'feed.evLevelUp': 'Niveau {n} atteint',
+    'feed.evStreak': '{n} jours de suite',
+    'feed.evSeason': 'Season {n} terminée !',
   },
 
   de: {
@@ -1244,5 +1260,9 @@ export const translations = {
     'medal.weight_5kg.desc': 'Verliere 5kg seit deinem ersten Eintrag',
     'medal.pushups_1000.title': '1000 Liegestütze',
     'medal.pushups_1000.desc': 'Sammle insgesamt 1000 Liegestütze',
+    'feed.evWorkout': 'Tag {n} abgeschlossen',
+    'feed.evLevelUp': 'Level {n} erreicht',
+    'feed.evStreak': '{n} Tage in Folge',
+    'feed.evSeason': 'Season {n} abgeschlossen!',
   },
 };

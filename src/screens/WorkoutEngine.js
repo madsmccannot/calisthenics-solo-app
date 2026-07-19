@@ -22,7 +22,7 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
   const exercises = workout?.exercises || [];
   const current = exercises[currentIndex];
   const isLast = currentIndex === exercises.length - 1;
-  // sem current, NÃO é time-based (senão o efeito abaixo lê current.quantity e rebenta)
+  // no current -> NOT time-based (otherwise the effect below reads current.quantity and crashes)
   const isTimeBased = !!current && current.type !== 'reps';
   const currentXp = current ? xpForExercise(current, className) : 0;
 
@@ -35,7 +35,7 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
   }, []);
 
   useEffect(() => {
-    if (!current) return; // dia sem exercícios -> não faz nada
+    if (!current) return; // day with no exercises -> do nothing
     if (phase === 'rest') {
       startTimer(current.rest_seconds, true);
     } else {
@@ -52,7 +52,7 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
   const goToNext = () => {
     const idx = currentIndexRef.current;
     const last = idx === exercises.length - 1;
-    // credita o XP do exercício que acabou de ser concluído
+    // credit the XP of the exercise just completed
     setEarnedXp((prev) => prev + xpForExercise(exercises[idx], className));
     if (last) {
       playBeep();

@@ -72,7 +72,7 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
             )}
           </View>
 
-          {/* Medalhas desbloqueadas */}
+          {/* Unlocked medals */}
           {newMedals.length > 0 && (
             <View style={styles.medalsBox}>
               <Text style={styles.medalsTitle}>
@@ -101,7 +101,7 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
             </Animated.View>
           )}
 
-          {/* Barra de progresso do nível atual */}
+          {/* Current level progress bar */}
           {levelInfo && (
             <View style={styles.levelBarWrap}>
               <View style={styles.levelBarHeader}>
@@ -116,7 +116,7 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
             </View>
           )}
 
-          {/* Repartição por exercício */}
+          {/* Per-exercise breakdown */}
           {breakdown.length > 0 && (
             <View style={styles.breakdownBox}>
               {breakdown.map((b, i) => (
@@ -140,7 +140,7 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
             </View>
           )}
 
-          {/* Stats rápidas */}
+          {/* Quick stats */}
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
               <View style={styles.statValueWrap}>
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14, paddingHorizontal: 8, alignItems: 'center',
     justifyContent: 'flex-start', borderWidth: 1, borderColor: colors.border,
   },
-  // altura fixa para a zona do valor -> os rótulos alinham nos 3 blocos
+  // fixed height for the value area -> labels align across the 3 boxes
   statValueWrap: { height: 42, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
   statNumber: { fontSize: 16, fontWeight: 'bold', color: colors.text, textAlign: 'center' },
   statLabel: { fontSize: 11, color: colors.textMuted, textAlign: 'center' },

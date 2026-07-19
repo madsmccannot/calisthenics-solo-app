@@ -88,17 +88,17 @@ export default function App() {
   const [dashboardKey, setDashboardKey] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
   const { t, chosen } = useI18n();
-  // undefined = ainda a verificar; null = sem sessão; objeto = com sessão
+  // undefined = still checking; null = no session; object = has session
   const [session, setSession] = useState(supabaseEnabled ? undefined : null);
   const [syncing, setSyncing] = useState(false);
-  const [username, setUsername] = useState(null); // nome de utilizador (null = ainda não escolhido)
+  const [username, setUsername] = useState(null); // username (null = not chosen yet)
 
   useEffect(() => {
     loadProfile();
   }, []);
 
-  // Restauro de sessão (app reaberta): fixa o utilizador, NÃO toca no local
-  // (offline-first). O login/registo são tratados em handleFreshAuth.
+  // Session restore (app reopened): sets the user, does NOT touch local
+  // (offline-first). Login/register are handled in handleFreshAuth.
   useEffect(() => {
     if (!supabaseEnabled) return;
     getSession().then(async (s) => {
@@ -106,7 +106,7 @@ export default function App() {
       if (s) setUsername(await getDisplayName());
       setSession(s);
     });
-    // reage a logout (e refresh) — não sincroniza aqui
+    // reacts to logout (and refresh) — no sync here
     const unsub = onAuthChange((s) => {
       if (!s) {
         setSyncUser(null);
@@ -116,7 +116,7 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Ao mandar a app para segundo plano, empurra o estado para a nuvem.
+  // When the app goes to background, push state to the cloud.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'background') flushSync();
@@ -124,15 +124,15 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
-  // Chamado pelo AuthScreen quando o utilizador entra/regista (auth fresca).
+  // Called by AuthScreen when the user signs in/registers (fresh auth).
   const handleFreshAuth = async (newSession, isNew) => {
     const uid = newSession?.user?.id;
     setSyncUser(uid);
     setSyncing(true);
     setSession(newSession);
-    await freshAuthSync(uid, isNew); // limpa local + (login: puxa | registo: vazio)
+    await freshAuthSync(uid, isNew); // clears local + (login: pull | register: empty)
     await loadProfile();
-    setUsername(await getDisplayName()); // registo -> null (pede nome); login -> nome da conta
+    setUsername(await getDisplayName()); // register -> null (asks for name); login -> account name
     setDashboardKey((k) => k + 1);
     setSyncing(false);
   };
@@ -153,9 +153,9 @@ export default function App() {
     const backAction = () => {
       if (activeTab !== 'dashboard') {
         setActiveTab('dashboard');
-        return true; // intercepta o botão
+        return true; // intercept the button
       }
-      return false; // deixa sair da app
+      return false; // let the app exit
     };
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
@@ -164,7 +164,7 @@ export default function App() {
 
   const loadProfile = async () => {
     const saved = await AsyncStorage.getItem('userProfile');
-    setProfile(saved ? JSON.parse(saved) : null); // repõe a null se não houver
+    setProfile(saved ? JSON.parse(saved) : null); // reset to null if none
   };
 
   const handleWorkoutComplete = async () => {
@@ -178,7 +178,7 @@ export default function App() {
           : day
       );
       await AsyncStorage.setItem('workoutPlan', JSON.stringify(updated));
-      // season completa quando não sobram dias de treino (ignora recuperação)
+      // season complete when no workout days remain (ignores recovery)
       const remaining = updated.filter(
         (d) => !d.completed && d.workout_type !== 'Recovery'
       ).length;
@@ -186,7 +186,7 @@ export default function App() {
     }
     const streakData = await updateStreak();
 
-    // Progressão: calcula e credita o XP do treino
+    // Progression: compute and credit the workout XP
     const className = profile.level || 'Iniciante';
     const workoutExercises = currentWorkout.exercises || [];
     const breakdown = xpBreakdown(workoutExercises, className);
@@ -198,7 +198,7 @@ export default function App() {
       .filter((e) => e.type !== 'reps')
       .reduce((a, e) => a + (Number(e.quantity) || 0), 0);
 
-    // reps por id de exercício (para as medalhas: "1000 flexões", etc.)
+    // reps per exercise id (for medals: "1000 push-ups", etc.)
     const repsById = workoutExercises
       .filter((e) => e.type === 'reps')
       .reduce((acc, e) => {
@@ -216,22 +216,22 @@ export default function App() {
       repsById,
     });
 
-    // medalhas desbloqueadas com este treino
+    // medals unlocked with this workout
     const weightLog = await getWeightLog();
-    const newMedals = await checkMedals({ streak: streakData, weightLog });
+    const newMedals = await checkMedals({ streak: streakData, weightLog, t });
 
     const season = await getSeason();
 
-    // marcos para o Feed (medalhas já são registadas dentro do checkMedals)
-    await logFeedEvent({ emoji: '💪', title: `Completaste o Dia ${currentWorkout.day_number}`, subtitle: `+${result.total} XP` });
+    // Feed milestones (medals are logged inside checkMedals)
+    await logFeedEvent({ emoji: '💪', title: t('feed.evWorkout', { n: currentWorkout.day_number }), subtitle: `+${result.total} XP` });
     if (result.leveledUp) {
-      await logFeedEvent({ emoji: '⭐', title: `Subiste ao nível ${result.toLevel}`, subtitle: result.title });
+      await logFeedEvent({ emoji: '⭐', title: t('feed.evLevelUp', { n: result.toLevel }), subtitle: t(result.title) });
     }
     if ([7, 14, 30, 50, 100].includes(streakData.current)) {
-      await logFeedEvent({ emoji: '🔥', title: `${streakData.current} dias seguidos` });
+      await logFeedEvent({ emoji: '🔥', title: t('feed.evStreak', { n: streakData.current }) });
     }
     if (seasonComplete) {
-      await logFeedEvent({ emoji: '🏆', title: `Season ${season} completa!` });
+      await logFeedEvent({ emoji: '🏆', title: t('feed.evSeason', { n: season }) });
     }
 
     setXpResult({ ...result, breakdown, newMedals, seasonComplete, season });
@@ -240,8 +240,8 @@ export default function App() {
     setCurrentWorkout(null);
   };
 
-  // Avança para a próxima season: gera um plano novo (mais difícil) ancorado a
-  // hoje. NÃO mexe na streak nem no XP/moedas/medalhas — só o plano é renovado.
+  // Advances to the next season: generates a new (harder) plan anchored to
+  // today. Does NOT touch streak, XP/coins/medals — only the plan is renewed.
   const handleStartNextSeason = async () => {
     await AsyncStorage.removeItem('workoutPlan');
     await advanceSeason();
@@ -252,7 +252,7 @@ export default function App() {
   };
 
   const handleReset = async () => {
-    await resetCloud(); // limpa também a nuvem se houver conta ligada
+    await resetCloud(); // also clears the cloud if an account is connected
     await AsyncStorage.removeItem('workoutPlan');
     await AsyncStorage.removeItem('streakData');
     await AsyncStorage.removeItem('userProfile');
@@ -275,7 +275,7 @@ export default function App() {
     return <LanguageScreen />;
   }
 
-  // Verificação da sessão (Supabase configurado)
+  // Session check (Supabase configured)
   if (supabaseEnabled && session === undefined) {
     return (
       <View style={{ flex: 1, backgroundColor: '#0f0f0f', justifyContent: 'center', alignItems: 'center' }}>
@@ -296,7 +296,7 @@ export default function App() {
     );
   }
 
-  // Conta criada mas ainda sem nome de utilizador -> pede o nome
+  // Account created but no username yet -> ask for the name
   if (supabaseEnabled && session && !username) {
     return <UsernameScreen onDone={handleUsernameDone} />;
   }

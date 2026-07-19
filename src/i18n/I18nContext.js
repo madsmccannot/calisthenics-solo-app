@@ -46,7 +46,7 @@ export function I18nProvider({ children }) {
     return s;
   }, [lang]);
 
-  if (!lang) return null; // ainda a carregar a preferência
+  if (!lang) return null; // still loading the preference
 
   return (
     <I18nContext.Provider value={{ lang, setLang, t, chosen }}>

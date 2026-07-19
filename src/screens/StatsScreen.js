@@ -128,14 +128,14 @@ export default function StatsScreen({ profile, activeTab }) {
 
     return (
       <View>
-        {/* Cabeçalho dias da semana */}
+        {/* Weekday header */}
         <View style={styles.calWeekRow}>
           {weekDayLabels.map((wd, i) => (
             <Text key={i} style={styles.calWeekDay}>{wd}</Text>
           ))}
         </View>
 
-        {/* Células */}
+        {/* Cells */}
         <View style={styles.calGrid}>
           {cells.map((date, i) => {
             if (!date) return <View key={`e-${i}`} style={styles.calEmpty} />;
@@ -264,7 +264,7 @@ export default function StatsScreen({ profile, activeTab }) {
         <Text style={styles.progressPct}>{t('stats.pctComplete', { pct: Math.round((completedDays / 30) * 100) })}</Text>
       </View>
 
-      {/* Calendário histórico */}
+      {/* History calendar */}
       <View style={styles.calCard}>
         <View style={styles.calHeader}>
           <TouchableOpacity onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}>
@@ -278,7 +278,7 @@ export default function StatsScreen({ profile, activeTab }) {
         {renderCalendar()}
       </View>
 
-      {/* Gráfico de peso */}
+      {/* Weight chart */}
       <View style={styles.weightCard}>
         <View style={styles.weightHeader}>
           <Text style={styles.cardLabel}>{t('stats.weightTitle')}</Text>

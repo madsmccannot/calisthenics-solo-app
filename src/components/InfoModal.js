@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { colors, radius } from '../theme';
 
-// Modal informativo de um só botão, no estilo da app (substitui o Alert nativo).
+// Single-button info modal in the app's style (replaces the native Alert).
 export default function InfoModal({
   visible,
   emoji = 'ℹ️',

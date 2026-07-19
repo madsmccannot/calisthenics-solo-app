@@ -1,8 +1,8 @@
-// Camada do Feed: junta os marcos do próprio utilizador (reais, guardados em
-// gameState.feedEvents) com a atividade de "outros".
+// Feed layer: merges the user's own milestones (real, stored in
+// gameState.feedEvents) with "other people's" activity.
 //
-// Hoje os "outros" são simulados localmente (feedSim). Quando existir backend,
-// basta trocar `getOthersFeed` por um fetch real — o merge e a UI não mudam.
+// Today the "others" are simulated locally (feedSim). When there is a backend,
+// just swap `getOthersFeed` for a real fetch — the merge and UI don't change.
 
 import { getFeedEvents } from './progressStore';
 import { generateOthersFeed } from '../config/feedSim';
@@ -10,7 +10,7 @@ import { fetchOthers, fetchOwn } from './feedRemote';
 import { supabaseEnabled } from './supabase';
 
 async function getOthersFeedLocal() {
-  // Sem Supabase: usa Express legado se existir, senão simulado.
+  // No Supabase: use legacy Express if present, otherwise simulated.
   const remote = await fetchOthers(50);
   if (remote !== null) return remote;
   return generateOthersFeed(Date.now());
@@ -18,18 +18,18 @@ async function getOthersFeedLocal() {
 
 const byTs = (a, b) => b.ts - a.ts;
 
-// filter: 'all' (próprio + outros) | 'me' (só o próprio)
+// filter: 'all' (own + others) | 'me' (own only)
 export async function getFeed(filter = 'all') {
   if (supabaseEnabled) {
-    // Online: TUDO vem da nuvem. Os próprios eventos persistem entre logins
-    // (guardados em feed_events com o teu user_id).
+    // Online: EVERYTHING comes from the cloud. Own events persist across logins
+    // (stored in feed_events with your user_id).
     const own = (await fetchOwn(50)) || [];
     if (filter === 'me') return own.sort(byTs);
     const others = (await fetchOthers(50)) || [];
     return [...own, ...others].sort(byTs);
   }
 
-  // Local: próprios do gameState, outros simulados.
+  // Local: own from gameState, others simulated.
   const own = (await getFeedEvents()).map((e) => ({ ...e, who: 'you' }));
   if (filter === 'me') return own.sort(byTs);
   const others = await getOthersFeedLocal();
