@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, radius } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
 import {
   getDailyMissions,
   toggleMission,
@@ -8,10 +9,10 @@ import {
 } from '../services/progressStore';
 import { missionRewards } from '../config/missions';
 
-// Card de missões diárias no Dashboard. Missões manuais (água/sono/...) são
-// marcáveis; a missão de treino auto-completa quando o treino do dia é feito.
-// Quando todas estão feitas, aparece o botão de reclamar recompensa.
+// Daily missions card on the Dashboard. Manual missions (water/sleep/...) are
+// tappable; the workout mission auto-completes when the day's workout is done.
 export default function MissionCard({ onClaimed }) {
+  const { t } = useI18n();
   const [missions, setMissions] = useState(null);
 
   useEffect(() => {
@@ -41,7 +42,7 @@ export default function MissionCard({ onClaimed }) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.title}>Missão diária</Text>
+        <Text style={styles.title}>{t('missions.daily')}</Text>
         <Text style={styles.reward}>
           +{rewards.xp} XP · +{rewards.coins} 🪙
         </Text>
@@ -59,15 +60,15 @@ export default function MissionCard({ onClaimed }) {
           </View>
           <Text style={styles.emoji}>{item.emoji}</Text>
           <Text style={[styles.label, item.done && styles.labelDone]}>
-            {item.label}
+            {t('missions.' + item.id)}
           </Text>
-          {item.auto && !item.done && <Text style={styles.autoTag}>treino</Text>}
+          {item.auto && !item.done && <Text style={styles.autoTag}>{t('missions.autoTag')}</Text>}
         </TouchableOpacity>
       ))}
 
       {missions.claimed ? (
         <View style={styles.claimedBanner}>
-          <Text style={styles.claimedText}>✓ Recompensa recebida</Text>
+          <Text style={styles.claimedText}>{t('missions.received')}</Text>
         </View>
       ) : (
         <TouchableOpacity
@@ -76,7 +77,7 @@ export default function MissionCard({ onClaimed }) {
           disabled={!allDone}
         >
           <Text style={[styles.claimText, !allDone && styles.claimTextDisabled]}>
-            {allDone ? `Reclamar +${rewards.xp} XP` : 'Completa tudo para reclamar'}
+            {allDone ? t('missions.claim', { xp: rewards.xp }) : t('missions.todo')}
           </Text>
         </TouchableOpacity>
       )}

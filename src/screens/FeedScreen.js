@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { colors, radius } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
 import Avatar from '../components/Avatar';
-import { getFeed, formatRelative } from '../services/feed';
+import { getFeed } from '../services/feed';
 import { getAvatar } from '../services/progressStore';
 
 // Cores estáveis para os avatares dos "outros" (a partir do nome).
@@ -14,10 +15,21 @@ function colorFor(name) {
 }
 
 export default function FeedScreen({ activeTab }) {
+  const { t } = useI18n();
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState('all');
   const [avatar, setAvatar] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const relTime = (ts) => {
+    const m = Math.floor((Date.now() - ts) / 60000);
+    if (m < 1) return t('feed.now');
+    if (m < 60) return t('feed.min', { m });
+    const h = Math.floor(m / 60);
+    if (h < 24) return t('feed.hour', { h });
+    const d = Math.floor(h / 24);
+    return d === 1 ? t('feed.yesterday') : t('feed.day', { d });
+  };
 
   useEffect(() => {
     if (activeTab === undefined || activeTab === 'feed') load();
@@ -43,16 +55,16 @@ export default function FeedScreen({ activeTab }) {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>Feed</Text>
+      <Text style={styles.title}>{t('feed.title')}</Text>
 
       <View style={styles.tabs}>
-        {[{ k: 'all', l: 'Todos' }, { k: 'me', l: 'Eu' }].map((t) => (
+        {[{ k: 'all', l: t('feed.all') }, { k: 'me', l: t('feed.me') }].map((tab) => (
           <TouchableOpacity
-            key={t.k}
-            style={[styles.tab, filter === t.k && styles.tabActive]}
-            onPress={() => setFilter(t.k)}
+            key={tab.k}
+            style={[styles.tab, filter === tab.k && styles.tabActive]}
+            onPress={() => setFilter(tab.k)}
           >
-            <Text style={[styles.tabText, filter === t.k && styles.tabTextActive]}>{t.l}</Text>
+            <Text style={[styles.tabText, filter === tab.k && styles.tabTextActive]}>{tab.l}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -60,10 +72,7 @@ export default function FeedScreen({ activeTab }) {
       {filter === 'me' && ownCount === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyEmoji}>📣</Text>
-          <Text style={styles.emptyText}>
-            Ainda não tens marcos. Completa treinos, sobe de nível e ganha medalhas —
-            vão aparecer aqui.
-          </Text>
+          <Text style={styles.emptyText}>{t('feed.emptyMsg')}</Text>
         </View>
       ) : (
         items.map((item) => (
@@ -80,7 +89,7 @@ export default function FeedScreen({ activeTab }) {
 
             <View style={styles.body}>
               <Text style={styles.name}>
-                {item.who === 'you' ? 'Tu' : item.name}
+                {item.who === 'you' ? t('feed.you') : item.name}
               </Text>
               <Text style={styles.text}>
                 {item.emoji} {item.title}
@@ -88,7 +97,7 @@ export default function FeedScreen({ activeTab }) {
               {item.subtitle ? <Text style={styles.subtitle}>{item.subtitle}</Text> : null}
             </View>
 
-            <Text style={styles.time}>{formatRelative(item.ts)}</Text>
+            <Text style={styles.time}>{relTime(item.ts)}</Text>
           </View>
         ))
       )}

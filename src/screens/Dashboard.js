@@ -9,12 +9,14 @@ import { getProgressSummary, rewardRecovery, markWorkoutMissionForToday, checkMe
 import { generateSeasonPlan } from '../services/planService';
 import { RECOVERY_XP } from '../config/xpTable';
 import { colors } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
 import RecoveryModal from '../components/RecoveryModal';
 import LevelHeader from '../components/LevelHeader';
 import MissionCard from '../components/MissionCard';
 import InfoModal from '../components/InfoModal';
 
 export default function Dashboard({ profile, onStartWorkout }) {
+  const { t } = useI18n();
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -133,8 +135,8 @@ export default function Dashboard({ profile, onStartWorkout }) {
         <ActivityIndicator size="large" color="#4ade80" />
         {generating && (
           <>
-            <Text style={styles.loadingText}>A gerar o teu plano de 30 dias...</Text>
-            <Text style={styles.loadingSubtext}>Isto pode demorar 1-2 minutos</Text>
+            <Text style={styles.loadingText}>{t('dashboard.generating')}</Text>
+            <Text style={styles.loadingSubtext}>{t('dashboard.generatingSub')}</Text>
           </>
         )}
       </View>
@@ -160,10 +162,10 @@ export default function Dashboard({ profile, onStartWorkout }) {
             <View style={styles.seasonCard}>
               <View style={styles.seasonHeader}>
                 <View>
-                  <Text style={styles.seasonName}>Season {season}</Text>
+                  <Text style={styles.seasonName}>{t('dashboard.season')} {season}</Text>
                   {tier && <Text style={styles.seasonTier}>{tier}</Text>}
                 </View>
-                <Text style={styles.seasonCount}>{done} / {total} dias</Text>
+                <Text style={styles.seasonCount}>{t('dashboard.daysCount', { done, total })}</Text>
               </View>
               <View style={styles.seasonBar}>
                 <View style={[styles.seasonFill, { width: `${(done / total) * 100}%` }]} />
@@ -190,14 +192,14 @@ export default function Dashboard({ profile, onStartWorkout }) {
               }}
             >
               <Text style={styles.dayDate}>{formatDate(day.date)}</Text>
-              <Text style={styles.dayNumber}>Dia {day.day_number}</Text>
+              <Text style={styles.dayNumber}>{t('dashboard.day')} {day.day_number}</Text>
               <Text style={[styles.dayType, { color: getTypeColor(day.workout_type) }]}>
                 {day.workout_type}
               </Text>
               {day.completed && <Text style={styles.checkmark}>✓</Text>}
               {day.workout_type !== 'Recovery' && !day.completed && (
                 <Text style={styles.exerciseCount}>
-                  {day.exercises?.length || 0} exercícios
+                  {day.exercises?.length || 0} {t('dashboard.exercises')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -214,9 +216,9 @@ export default function Dashboard({ profile, onStartWorkout }) {
       <InfoModal
         visible={emptyDayInfo}
         emoji="🛠️"
-        title="Dia sem exercícios"
-        message="Este dia ficou vazio numa geração anterior. Vai ao Perfil e aplica a carga novamente para o preencher."
-        buttonText="Entendido"
+        title={t('dashboard.emptyTitle')}
+        message={t('dashboard.emptyMsg')}
+        buttonText={t('common.understood')}
         onDismiss={() => setEmptyDayInfo(false)}
       />
     </>

@@ -4,8 +4,10 @@ import {
   StyleSheet, Modal, ScrollView
 } from 'react-native';
 import ConfirmModal from './ConfirmModal';
+import { useI18n } from '../i18n/I18nContext';
 
 export default function WeightModal({ visible, onSave, onDelete, onDismiss, entries }) {
+  const { t } = useI18n();
   const [weight, setWeight] = useState('');
   const [mode, setMode] = useState('add');
   const [entryToDelete, setEntryToDelete] = useState(null);
@@ -46,7 +48,7 @@ export default function WeightModal({ visible, onSave, onDelete, onDismiss, entr
                 onPress={() => setMode('add')}
               >
                 <Text style={[styles.tabText, mode === 'add' && styles.tabTextActive]}>
-                  + Registar
+                  {t('weight.add')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -54,7 +56,7 @@ export default function WeightModal({ visible, onSave, onDelete, onDismiss, entr
                 onPress={() => setMode('manage')}
               >
                 <Text style={[styles.tabText, mode === 'manage' && styles.tabTextActive]}>
-                  Gerir registos
+                  {t('weight.manage')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -62,8 +64,8 @@ export default function WeightModal({ visible, onSave, onDelete, onDismiss, entr
             {mode === 'add' ? (
               <>
                 <Text style={styles.emoji}>⚖️</Text>
-                <Text style={styles.title}>Registar Peso</Text>
-                <Text style={styles.subtitle}>Como estás hoje?</Text>
+                <Text style={styles.title}>{t('weight.logTitle')}</Text>
+                <Text style={styles.subtitle}>{t('weight.howToday')}</Text>
                 <TextInput
                   style={styles.input}
                   keyboardType="numeric"
@@ -79,12 +81,12 @@ export default function WeightModal({ visible, onSave, onDelete, onDismiss, entr
                   onPress={handleSave}
                   disabled={!weight}
                 >
-                  <Text style={styles.saveBtnText}>Guardar</Text>
+                  <Text style={styles.saveBtnText}>{t('weight.save')}</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
-                <Text style={styles.manageTitle}>Os teus registos</Text>
+                <Text style={styles.manageTitle}>{t('weight.yourEntries')}</Text>
                 <ScrollView style={styles.entriesList}>
                   {entries && entries.length > 0 ? (
                     [...entries].reverse().map((entry, i) => (
@@ -105,14 +107,14 @@ export default function WeightModal({ visible, onSave, onDelete, onDismiss, entr
                       </View>
                     ))
                   ) : (
-                    <Text style={styles.emptyText}>Ainda não tens registos.</Text>
+                    <Text style={styles.emptyText}>{t('weight.noEntries')}</Text>
                   )}
                 </ScrollView>
               </>
             )}
 
             <TouchableOpacity style={styles.dismissBtn} onPress={onDismiss}>
-              <Text style={styles.dismissBtnText}>Fechar</Text>
+              <Text style={styles.dismissBtnText}>{t('common.close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -121,10 +123,10 @@ export default function WeightModal({ visible, onSave, onDelete, onDismiss, entr
       <ConfirmModal
         visible={!!entryToDelete}
         emoji="🗑️"
-        title="Remover registo?"
-        message={entryToDelete ? `Tens a certeza que queres remover o registo de ${entryToDelete.weight}kg do dia ${entryToDelete.date}?` : ''}
-        confirmText="Remover"
-        cancelText="Cancelar"
+        title={t('weight.removeTitle')}
+        message={entryToDelete ? t('weight.removeMsg', { weight: entryToDelete.weight, date: entryToDelete.date }) : ''}
+        confirmText={t('weight.remove')}
+        cancelText={t('profile.cancel')}
         confirmColor="#ef4444"
         onConfirm={() => {
           onDelete(entryToDelete);

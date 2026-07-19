@@ -7,13 +7,29 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LineChart } from 'react-native-chart-kit';
 import { getStreakData, getWeightLog, addWeightEntry, deleteWeightEntry } from '../services/localStore';
 import { getMedalsStatus } from '../services/progressStore';
+import { useI18n } from '../i18n/I18nContext';
 import WeightModal from '../components/WeightModal';
 import MedalsWall from '../components/MedalsWall';
 
 const screenWidth = Dimensions.get('window').width - 32;
-const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+// Short weekday names (Monday-first) in the given language.
+function localizedWeekDays(lang) {
+  try {
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      // 2024-01-01 is a Monday
+      out.push(new Date(2024, 0, 1 + i).toLocaleDateString(lang, { weekday: 'short' }));
+    }
+    return out;
+  } catch {
+    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  }
+}
 
 export default function StatsScreen({ profile, activeTab }) {
+  const { t, lang } = useI18n();
+  const weekDayLabels = localizedWeekDays(lang);
   const [streak, setStreak] = useState({ current: 0, best: 0 });
   const [completedDays, setCompletedDays] = useState(0);
   const [totalExercises, setTotalExercises] = useState(0);
@@ -65,10 +81,10 @@ export default function StatsScreen({ profile, activeTab }) {
     : null;
 
   const getBmiInfo = (bmi) => {
-    if (bmi < 18.5) return { label: 'Abaixo do peso', color: '#3b82f6' };
-    if (bmi < 25) return { label: 'Peso normal', color: '#4ade80' };
-    if (bmi < 30) return { label: 'Excesso de peso', color: '#f97316' };
-    return { label: 'Obesidade', color: '#ef4444' };
+    if (bmi < 18.5) return { label: 'stats.bmiUnder', color: '#3b82f6' };
+    if (bmi < 25) return { label: 'stats.bmiNormal', color: '#4ade80' };
+    if (bmi < 30) return { label: 'stats.bmiOver', color: '#f97316' };
+    return { label: 'stats.bmiObese', color: '#ef4444' };
   };
 
   const getBmiColor = (weight) => {
@@ -114,8 +130,8 @@ export default function StatsScreen({ profile, activeTab }) {
       <View>
         {/* Cabeçalho dias da semana */}
         <View style={styles.calWeekRow}>
-          {WEEK_DAYS.map((wd) => (
-            <Text key={wd} style={styles.calWeekDay}>{wd}</Text>
+          {weekDayLabels.map((wd, i) => (
+            <Text key={i} style={styles.calWeekDay}>{wd}</Text>
           ))}
         </View>
 
@@ -160,19 +176,19 @@ export default function StatsScreen({ profile, activeTab }) {
         <View style={styles.calLegend}>
           <View style={styles.calLegendItem}>
             <View style={[styles.calLegendDot, { backgroundColor: '#4ade80' }]} />
-            <Text style={styles.calLegendText}>Completo</Text>
+            <Text style={styles.calLegendText}>{t('stats.legendComplete')}</Text>
           </View>
           <View style={styles.calLegendItem}>
             <View style={[styles.calLegendDot, { backgroundColor: '#ef4444' }]} />
-            <Text style={styles.calLegendText}>Falhado</Text>
+            <Text style={styles.calLegendText}>{t('stats.legendMissed')}</Text>
           </View>
           <View style={styles.calLegendItem}>
             <View style={[styles.calLegendDot, { backgroundColor: '#22c55e' }]} />
-            <Text style={styles.calLegendText}>Recovery</Text>
+            <Text style={styles.calLegendText}>{t('stats.legendRecovery')}</Text>
           </View>
           <View style={styles.calLegendItem}>
             <View style={[styles.calLegendDot, { borderWidth: 1.5, borderColor: '#f97316', backgroundColor: 'transparent' }]} />
-            <Text style={styles.calLegendText}>Hoje</Text>
+            <Text style={styles.calLegendText}>{t('stats.legendToday')}</Text>
           </View>
         </View>
       </View>
@@ -181,18 +197,18 @@ export default function StatsScreen({ profile, activeTab }) {
 
   const bmiInfo = bmi ? getBmiInfo(parseFloat(bmi)) : null;
   const hasWeightData = weightLog.length >= 1;
-  const monthName = calendarMonth.toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
+  const monthName = calendarMonth.toLocaleDateString(lang, { month: 'long', year: 'numeric' });
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>As minhas Estatísticas</Text>
+      <Text style={styles.title}>{t('stats.title')}</Text>
 
-      {/* IMC */}
+      {/* BMI */}
       {bmi && (
         <View style={styles.bmiCard}>
-          <Text style={styles.cardLabel}>Índice de Massa Corporal</Text>
+          <Text style={styles.cardLabel}>{t('stats.bmi')}</Text>
           <Text style={[styles.bmiNumber, { color: bmiInfo.color }]}>{bmi}</Text>
-          <Text style={[styles.bmiLabel, { color: bmiInfo.color }]}>{bmiInfo.label}</Text>
+          <Text style={[styles.bmiLabel, { color: bmiInfo.color }]}>{t(bmiInfo.label)}</Text>
           <View style={styles.bmiBar}>
             <View style={[styles.bmiSegment, { backgroundColor: '#3b82f6' }]} />
             <View style={[styles.bmiSegment, { backgroundColor: '#4ade80' }]} />
@@ -216,36 +232,36 @@ export default function StatsScreen({ profile, activeTab }) {
         <View style={styles.statCard}>
           <Text style={styles.statEmoji}>🔥</Text>
           <Text style={styles.statNumber}>{streak.current}</Text>
-          <Text style={styles.statLabel}>Streak atual</Text>
+          <Text style={styles.statLabel}>{t('stats.streak')}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statEmoji}>🏆</Text>
           <Text style={styles.statNumber}>{streak.best}</Text>
-          <Text style={styles.statLabel}>Melhor streak</Text>
+          <Text style={styles.statLabel}>{t('stats.bestStreak')}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statEmoji}>📅</Text>
           <Text style={styles.statNumber}>{completedDays}</Text>
-          <Text style={styles.statLabel}>Dias completos</Text>
+          <Text style={styles.statLabel}>{t('stats.completedDays')}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statEmoji}>💪</Text>
           <Text style={styles.statNumber}>{totalExercises}</Text>
-          <Text style={styles.statLabel}>Exercícios feitos</Text>
+          <Text style={styles.statLabel}>{t('stats.exercisesDone')}</Text>
         </View>
       </View>
 
-      {/* Medalhas */}
+      {/* Medals */}
       <MedalsWall medals={medals} />
 
-      {/* Progresso */}
+      {/* Progress */}
       <View style={styles.progressCard}>
-        <Text style={styles.cardLabel}>Progresso do Plano</Text>
-        <Text style={styles.progressText}>{completedDays} / 30 dias</Text>
+        <Text style={styles.cardLabel}>{t('stats.planProgress')}</Text>
+        <Text style={styles.progressText}>{t('stats.daysOf', { done: completedDays })}</Text>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${(completedDays / 30) * 100}%` }]} />
         </View>
-        <Text style={styles.progressPct}>{Math.round((completedDays / 30) * 100)}% concluído</Text>
+        <Text style={styles.progressPct}>{t('stats.pctComplete', { pct: Math.round((completedDays / 30) * 100) })}</Text>
       </View>
 
       {/* Calendário histórico */}
@@ -265,9 +281,9 @@ export default function StatsScreen({ profile, activeTab }) {
       {/* Gráfico de peso */}
       <View style={styles.weightCard}>
         <View style={styles.weightHeader}>
-          <Text style={styles.cardLabel}>Evolução do Peso</Text>
+          <Text style={styles.cardLabel}>{t('stats.weightTitle')}</Text>
           <TouchableOpacity style={styles.addWeightBtn} onPress={() => setShowWeightModal(true)}>
-            <Text style={styles.addWeightBtnText}>+ Registar</Text>
+            <Text style={styles.addWeightBtnText}>{t('weight.add')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -296,14 +312,12 @@ export default function StatsScreen({ profile, activeTab }) {
             />
           </>
         ) : hasWeightData ? (
-          <Text style={styles.oneEntryText}>Regista mais um peso para ver o gráfico.</Text>
+          <Text style={styles.oneEntryText}>{t('stats.oneMore')}</Text>
         ) : (
           <View style={styles.emptyWeight}>
-            <Text style={styles.emptyWeightText}>
-              Regista o teu peso para ver a evolução ao longo do tempo.
-            </Text>
+            <Text style={styles.emptyWeightText}>{t('stats.emptyWeight')}</Text>
             <TouchableOpacity style={styles.emptyWeightBtn} onPress={() => setShowWeightModal(true)}>
-              <Text style={styles.emptyWeightBtnText}>Registar agora</Text>
+              <Text style={styles.emptyWeightBtnText}>{t('stats.logNow')}</Text>
             </TouchableOpacity>
           </View>
         )}

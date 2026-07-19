@@ -186,7 +186,14 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
                 style={[styles.levelBtn, level === l && styles.levelBtnActive]}
                 onPress={() => setLevel(l)}
               >
-                <Text style={[styles.levelText, level === l && styles.levelTextActive]}>{t('level.' + l)}</Text>
+                <Text
+                  style={[styles.levelText, level === l && styles.levelTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {t('level.' + l)}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>

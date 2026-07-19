@@ -3,8 +3,10 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Animated, ScrollView
 } from 'react-native';
 import { colors, radius } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
 
 export default function CompletionScreen({ workout, streak, xpResult, onBack, onStartNextSeason }) {
+  const { t } = useI18n();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const levelUpAnim = useRef(new Animated.Value(0)).current;
@@ -50,23 +52,20 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
             🏆
           </Animated.Text>
 
-          <Text style={styles.title}>Treino Concluído!</Text>
-          <Text style={styles.subtitle}>Dia {workout.day_number} completo</Text>
+          <Text style={styles.title}>{t('completion.title')}</Text>
+          <Text style={styles.subtitle}>{t('completion.dayComplete', { n: workout.day_number })}</Text>
 
           {seasonComplete && (
             <View style={styles.seasonBox}>
               <Text style={styles.seasonEmoji}>🎉</Text>
-              <Text style={styles.seasonTitle}>Season {season} Completa!</Text>
-              <Text style={styles.seasonSub}>
-                Terminaste os 30 dias. A tua streak e o teu progresso continuam —
-                a próxima season chega mais difícil.
-              </Text>
+              <Text style={styles.seasonTitle}>{t('completion.seasonComplete', { n: season })}</Text>
+              <Text style={styles.seasonSub}>{t('completion.seasonSub')}</Text>
             </View>
           )}
 
-          {/* Total de XP ganho */}
+          {/* Total XP earned */}
           <View style={styles.xpTotalBox}>
-            <Text style={styles.xpTotalLabel}>XP ganho</Text>
+            <Text style={styles.xpTotalLabel}>{t('completion.xpEarned')}</Text>
             <Text style={styles.xpTotalValue}>+{total}</Text>
             {coinsEarned > 0 && (
               <Text style={styles.coinsEarned}>+{coinsEarned} 🪙</Text>
@@ -77,7 +76,7 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
           {newMedals.length > 0 && (
             <View style={styles.medalsBox}>
               <Text style={styles.medalsTitle}>
-                {newMedals.length > 1 ? 'Novas medalhas!' : 'Nova medalha!'}
+                {newMedals.length > 1 ? t('completion.newMedals') : t('completion.newMedal')}
               </Text>
               {newMedals.map((m) => (
                 <View key={m.id} style={styles.medalRow}>
@@ -95,7 +94,7 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
           {/* Level up */}
           {leveledUp && levelInfo && (
             <Animated.View style={[styles.levelUpBox, { opacity: levelUpAnim }]}>
-              <Text style={styles.levelUpText}>⭐ LEVEL UP</Text>
+              <Text style={styles.levelUpText}>⭐ {t('completion.levelUp')}</Text>
               <Text style={styles.levelUpSub}>
                 {xpResult.fromLevel} → {xpResult.toLevel} · {xpResult.title}
               </Text>
@@ -106,7 +105,7 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
           {levelInfo && (
             <View style={styles.levelBarWrap}>
               <View style={styles.levelBarHeader}>
-                <Text style={styles.levelBarLevel}>Nível {levelInfo.level}</Text>
+                <Text style={styles.levelBarLevel}>{t('profile.statLevel')} {levelInfo.level}</Text>
                 <Text style={styles.levelBarXp}>
                   {levelInfo.xpIntoLevel} / {levelInfo.xpForNext}
                 </Text>
@@ -128,13 +127,13 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
               ))}
               {xpResult?.bonus > 0 && (
                 <View style={styles.breakdownRow}>
-                  <Text style={styles.breakdownBonus}>Bónus de conclusão</Text>
+                  <Text style={styles.breakdownBonus}>{t('completion.completionBonus')}</Text>
                   <Text style={styles.breakdownXp}>+{xpResult.bonus}</Text>
                 </View>
               )}
               {xpResult?.streakBonus > 0 && (
                 <View style={styles.breakdownRow}>
-                  <Text style={styles.breakdownBonus}>🔥 Bónus de streak</Text>
+                  <Text style={styles.breakdownBonus}>{t('completion.streakBonus')}</Text>
                   <Text style={styles.breakdownXp}>+{xpResult.streakBonus}</Text>
                 </View>
               )}
@@ -147,39 +146,39 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
               <View style={styles.statValueWrap}>
                 <Text style={styles.statNumber}>{workout.exercises?.length || 0}</Text>
               </View>
-              <Text style={styles.statLabel}>Exercícios</Text>
+              <Text style={styles.statLabel}>{t('completion.exercises')}</Text>
             </View>
             <View style={styles.statBox}>
               <View style={styles.statValueWrap}>
                 <Text style={styles.statNumber}>🔥 {streak}</Text>
               </View>
-              <Text style={styles.statLabel}>Dias seguidos</Text>
+              <Text style={styles.statLabel}>{t('completion.dayStreak')}</Text>
             </View>
             <View style={styles.statBox}>
               <View style={styles.statValueWrap}>
                 <Text style={styles.statNumber} numberOfLines={2}>{workout.workout_type}</Text>
               </View>
-              <Text style={styles.statLabel}>Tipo</Text>
+              <Text style={styles.statLabel}>{t('completion.type')}</Text>
             </View>
           </View>
 
           <View style={styles.messageBox}>
             <Text style={styles.message}>
               {streak >= 7
-                ? '🔥 Uma semana sem falhar! Continua assim!'
+                ? t('completion.msg7')
                 : streak >= 3
-                ? '💪 Estás a criar um hábito. Não pares!'
-                : '✅ Bom trabalho! Volta amanhã para manter o streak.'}
+                ? t('completion.msg3')
+                : t('completion.msg0')}
             </Text>
           </View>
 
           {seasonComplete ? (
             <TouchableOpacity style={styles.backBtn} onPress={onStartNextSeason}>
-              <Text style={styles.backBtnText}>Começar Season {season + 1} →</Text>
+              <Text style={styles.backBtnText}>{t('completion.startNext', { n: season + 1 })}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-              <Text style={styles.backBtnText}>Ver o meu Plano →</Text>
+              <Text style={styles.backBtnText}>{t('completion.seePlan')}</Text>
             </TouchableOpacity>
           )}
         </ScrollView>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { colors, radius } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
 
 const TIER_COLOR = {
   bronze: colors.bronze,
@@ -11,12 +12,13 @@ const TIER_COLOR = {
 // Grelha de medalhas. As desbloqueadas aparecem a cor do tier; as bloqueadas
 // ficam esbatidas com cadeado. `medals` vem de progressStore.getMedalsStatus().
 export default function MedalsWall({ medals = [] }) {
+  const { t } = useI18n();
   const unlockedCount = medals.filter((m) => m.unlocked).length;
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.cardLabel}>Medalhas</Text>
+        <Text style={styles.cardLabel}>{t('medals.title')}</Text>
         <Text style={styles.count}>
           {unlockedCount} / {medals.length}
         </Text>

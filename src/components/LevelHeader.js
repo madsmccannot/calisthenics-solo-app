@@ -1,10 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { colors, radius } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
 
 // Cabeçalho de progressão no topo do Dashboard: nível, título, barra de XP,
 // streak e moedas. `summary` vem de progressStore.getProgressSummary().
 export default function LevelHeader({ summary, streak = 0 }) {
+  const { t } = useI18n();
   const fillAnim = useRef(new Animated.Value(0)).current;
 
   const level = summary?.level ?? 1;
@@ -35,7 +37,7 @@ export default function LevelHeader({ summary, streak = 0 }) {
         </View>
         <View style={styles.identity}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>Nível {level}</Text>
+          <Text style={styles.subtitle}>{t('profile.statLevel')} {level}</Text>
         </View>
         <View style={styles.pills}>
           <View style={styles.pill}>

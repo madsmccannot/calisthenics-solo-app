@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView
 } from 'react-native';
 import { colors, radius } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
 import Avatar from './Avatar';
 import { CATEGORIES, itemsBySlot } from '../config/shopCatalog';
 import { getLockerState, buyItem, equipItem } from '../services/progressStore';
@@ -10,6 +11,7 @@ import { getLockerState, buyItem, equipItem } from '../services/progressStore';
 // Loja + aparência num só ecrã: compra com moedas e equipa. Itens grátis já
 // vêm desbloqueados; comprar equipa logo.
 export default function LockerModal({ visible, onClose, onChanged }) {
+  const { t } = useI18n();
   const [locker, setLocker] = useState(null);
   const [activeSlot, setActiveSlot] = useState('skin');
   const [notice, setNotice] = useState('');
@@ -32,7 +34,7 @@ export default function LockerModal({ visible, onClose, onChanged }) {
     } else {
       const res = await buyItem(item.id);
       if (!res.ok) {
-        setNotice(res.reason === 'coins' ? 'Moedas insuficientes' : '');
+        setNotice(res.reason === 'coins' ? t('locker.notEnough') : '');
         return;
       }
       setNotice('');
@@ -54,7 +56,7 @@ export default function LockerModal({ visible, onClose, onChanged }) {
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>Aparência & Loja</Text>
+            <Text style={styles.title}>{t('locker.title')}</Text>
             <View style={styles.coinPill}>
               <Text style={styles.coinText}>🪙 {locker.coins}</Text>
             </View>
@@ -77,7 +79,7 @@ export default function LockerModal({ visible, onClose, onChanged }) {
                 onPress={() => { setActiveSlot(c.slot); setNotice(''); }}
               >
                 <Text style={[styles.tabText, activeSlot === c.slot && styles.tabTextActive]}>
-                  {c.label}
+                  {t('locker.slot.' + c.slot)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -101,9 +103,9 @@ export default function LockerModal({ visible, onClose, onChanged }) {
                   <Swatch item={item} />
                   <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                   {equipped ? (
-                    <Text style={styles.equipped}>Equipado</Text>
+                    <Text style={styles.equipped}>{t('locker.equipped')}</Text>
                   ) : owned ? (
-                    <Text style={styles.equip}>Equipar</Text>
+                    <Text style={styles.equip}>{t('locker.equip')}</Text>
                   ) : (
                     <Text style={[styles.cost, !affordable && styles.costLocked]}>
                       🪙 {item.cost}
@@ -115,7 +117,7 @@ export default function LockerModal({ visible, onClose, onChanged }) {
           </ScrollView>
 
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeText}>Fechar</Text>
+            <Text style={styles.closeText}>{t('common.close')}</Text>
           </TouchableOpacity>
         </View>
       </View>

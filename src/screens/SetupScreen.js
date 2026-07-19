@@ -59,7 +59,12 @@ export default function SetupScreen({ onSetupComplete }) {
             style={[styles.levelBtn, level === l && styles.levelBtnActive]}
             onPress={() => setLevel(l)}
           >
-            <Text style={[styles.levelText, level === l && styles.levelTextActive]}>
+            <Text
+              style={[styles.levelText, level === l && styles.levelTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
               {t('level.' + l)}
             </Text>
           </TouchableOpacity>

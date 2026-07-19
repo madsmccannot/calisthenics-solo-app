@@ -3,8 +3,10 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   Modal, Animated
 } from 'react-native';
+import { useI18n } from '../i18n/I18nContext';
 
 export default function RecoveryModal({ visible, onDismiss, onComplete }) {
+  const { t } = useI18n();
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -30,20 +32,17 @@ export default function RecoveryModal({ visible, onDismiss, onComplete }) {
         <Animated.View style={[styles.modal, { transform: [{ scale: scaleAnim }] }]}>
 
           <Text style={styles.emoji}>🧘</Text>
-          <Text style={styles.title}>Dia de Recuperação</Text>
-          <Text style={styles.body}>
-            O teu corpo precisa descansar para crescer mais forte.{'\n\n'}
-            Aproveita para alongar, caminhar ou simplesmente descansar.
-          </Text>
+          <Text style={styles.title}>{t('recovery.title')}</Text>
+          <Text style={styles.body}>{t('recovery.body')}</Text>
 
           <View style={styles.divider} />
 
           <TouchableOpacity style={styles.completeBtn} onPress={onComplete}>
-            <Text style={styles.completeBtnText}>✓ Marcar como feito</Text>
+            <Text style={styles.completeBtnText}>{t('recovery.done')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.dismissBtn} onPress={onDismiss}>
-            <Text style={styles.dismissBtnText}>Fechar</Text>
+            <Text style={styles.dismissBtnText}>{t('common.close')}</Text>
           </TouchableOpacity>
 
         </Animated.View>

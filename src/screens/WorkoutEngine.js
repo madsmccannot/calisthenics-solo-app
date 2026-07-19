@@ -6,8 +6,10 @@ import {
 import { playBeep } from '../services/soundService';
 import AnimationPlayer from '../components/AnimationPlayer';
 import { xpForExercise } from '../config/xpTable';
+import { useI18n } from '../i18n/I18nContext';
 
 export default function WorkoutEngine({ workout, onComplete, onBack, className = 'Iniciante' }) {
+  const { t } = useI18n();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [phase, setPhase] = useState('exercise');
   const [timeLeft, setTimeLeft] = useState(null);
@@ -136,17 +138,17 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
 
   const getButtonLabel = () => {
     if (isTimeBased) {
-      if (isRunning) return '⏭ Saltar';
-      return isLast ? '🏁 Terminar Treino' : '▶ Iniciar';
+      if (isRunning) return t('workout.skip');
+      return isLast ? t('workout.finish') : t('workout.start');
     }
-    return isLast ? '🏁 Terminar Treino' : '✓ Feito';
+    return isLast ? t('workout.finish') : t('workout.done');
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
-          <Text style={styles.backBtn}>← Sair</Text>
+          <Text style={styles.backBtn}>{t('workout.exit')}</Text>
         </TouchableOpacity>
         <View style={styles.headerRight}>
           <Text style={styles.xpCounter}>⚡ {earnedXp} XP</Text>
@@ -178,14 +180,14 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
                 {current.type === 'reps' ? (
                   <>
                     <Text style={styles.quantityNumber}>{current.quantity}</Text>
-                    <Text style={styles.quantityLabel}>repetições</Text>
+                    <Text style={styles.quantityLabel}>{t('workout.repetitions')}</Text>
                   </>
                 ) : (
                   <>
                     <Text style={styles.quantityNumber}>
                       {isRunning ? timeLeft : current.quantity}
                     </Text>
-                    <Text style={styles.quantityLabel}>segundos</Text>
+                    <Text style={styles.quantityLabel}>{t('workout.seconds')}</Text>
                   </>
                 )}
               </View>
@@ -196,13 +198,13 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
               )}
             </View>
 
-            <Text style={styles.upNextLabel}>A seguir</Text>
+            <Text style={styles.upNextLabel}>{t('workout.upNext')}</Text>
             {exercises.slice(currentIndex + 1, currentIndex + 4).map((ex, i) => (
               <View key={i} style={styles.upNextItem}>
                 <Text style={styles.upNextDot}>·</Text>
                 <Text style={styles.upNextName}>{ex.display_name}</Text>
                 <Text style={styles.upNextQty}>
-                  {ex.quantity} {ex.type === 'reps' ? 'reps' : 'seg'}
+                  {ex.quantity} {ex.type === 'reps' ? t('workout.reps') : t('workout.sec')}
                 </Text>
               </View>
             ))}
@@ -213,17 +215,17 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
           </>
         ) : (
           <View style={styles.restContainer}>
-            <Text style={styles.restTitle}>Descansa</Text>
+            <Text style={styles.restTitle}>{t('workout.rest')}</Text>
             <Text style={styles.restTimer}>{timeLeft}s</Text>
             <View style={styles.timerBarContainer}>
               <Animated.View style={[styles.timerBarFill, { width: progressWidth }]} />
             </View>
-            <Text style={styles.nextUpLabel}>Próximo:</Text>
+            <Text style={styles.nextUpLabel}>{t('workout.next')}</Text>
             <Text style={styles.nextExercise}>
-              {isLast ? '🏁 Fim do Treino' : exercises[currentIndex + 1]?.display_name}
+              {isLast ? t('workout.end') : exercises[currentIndex + 1]?.display_name}
             </Text>
             <TouchableOpacity style={styles.skipBtn} onPress={skipRest}>
-              <Text style={styles.skipBtnText}>Saltar Descanso →</Text>
+              <Text style={styles.skipBtnText}>{t('workout.skipRest')}</Text>
             </TouchableOpacity>
           </View>
         )}
