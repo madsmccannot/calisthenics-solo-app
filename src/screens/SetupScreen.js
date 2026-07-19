@@ -5,17 +5,20 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { scheduleSync } from '../services/cloudSync';
+import { useI18n } from '../i18n/I18nContext';
 
+// Canonical level values (kept fixed — used as keys and sent to the AI).
 const LEVELS = ['Iniciante', 'Intermédio', 'Avançado'];
 
 export default function SetupScreen({ onSetupComplete }) {
+  const { t } = useI18n();
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
   const [level, setLevel] = useState('Iniciante');
 
   const handleStart = async () => {
     if (!weight || !height) {
-      Alert.alert('Atenção', 'Preenche o peso e a altura.');
+      Alert.alert('', t('setup.fillWH'));
       return;
     }
 
@@ -28,9 +31,9 @@ export default function SetupScreen({ onSetupComplete }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Configura o teu Perfil</Text>
+      <Text style={styles.title}>{t('setup.title')}</Text>
 
-      <Text style={styles.label}>Peso (kg)</Text>
+      <Text style={styles.label}>{t('setup.weight')}</Text>
       <TextInput
         style={styles.input}
         keyboardType="numeric"
@@ -39,7 +42,7 @@ export default function SetupScreen({ onSetupComplete }) {
         onChangeText={setWeight}
       />
 
-      <Text style={styles.label}>Altura (cm)</Text>
+      <Text style={styles.label}>{t('setup.height')}</Text>
       <TextInput
         style={styles.input}
         keyboardType="numeric"
@@ -48,7 +51,7 @@ export default function SetupScreen({ onSetupComplete }) {
         onChangeText={setHeight}
       />
 
-      <Text style={styles.label}>Nível de Fitness</Text>
+      <Text style={styles.label}>{t('setup.level')}</Text>
       <View style={styles.levelContainer}>
         {LEVELS.map((l) => (
           <TouchableOpacity
@@ -57,14 +60,14 @@ export default function SetupScreen({ onSetupComplete }) {
             onPress={() => setLevel(l)}
           >
             <Text style={[styles.levelText, level === l && styles.levelTextActive]}>
-              {l}
+              {t('level.' + l)}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       <TouchableOpacity style={styles.startBtn} onPress={handleStart}>
-        <Text style={styles.startBtnText}>Começar →</Text>
+        <Text style={styles.startBtnText}>{t('setup.start')} →</Text>
       </TouchableOpacity>
     </ScrollView>
   );

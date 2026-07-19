@@ -144,15 +144,21 @@ export default function CompletionScreen({ workout, streak, xpResult, onBack, on
           {/* Stats rápidas */}
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{workout.exercises?.length || 0}</Text>
+              <View style={styles.statValueWrap}>
+                <Text style={styles.statNumber}>{workout.exercises?.length || 0}</Text>
+              </View>
               <Text style={styles.statLabel}>Exercícios</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>🔥 {streak}</Text>
+              <View style={styles.statValueWrap}>
+                <Text style={styles.statNumber}>🔥 {streak}</Text>
+              </View>
               <Text style={styles.statLabel}>Dias seguidos</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{workout.workout_type}</Text>
+              <View style={styles.statValueWrap}>
+                <Text style={styles.statNumber} numberOfLines={2}>{workout.workout_type}</Text>
+              </View>
               <Text style={styles.statLabel}>Tipo</Text>
             </View>
           </View>
@@ -248,9 +254,12 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: 12, marginBottom: 20, width: '100%' },
   statBox: {
     flex: 1, backgroundColor: colors.card, borderRadius: radius.lg,
-    padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.border,
+    paddingVertical: 14, paddingHorizontal: 8, alignItems: 'center',
+    justifyContent: 'flex-start', borderWidth: 1, borderColor: colors.border,
   },
-  statNumber: { fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
+  // altura fixa para a zona do valor -> os rótulos alinham nos 3 blocos
+  statValueWrap: { height: 42, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  statNumber: { fontSize: 16, fontWeight: 'bold', color: colors.text, textAlign: 'center' },
   statLabel: { fontSize: 11, color: colors.textMuted, textAlign: 'center' },
   messageBox: {
     backgroundColor: colors.card, borderRadius: radius.lg, padding: 18,

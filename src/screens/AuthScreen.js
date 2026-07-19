@@ -4,9 +4,11 @@ import {
   ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { colors, radius } from '../theme';
-import { signInWithIdentifier, signUp, passwordIssues, passwordStrong, friendlyAuthError } from '../services/auth';
+import { useI18n } from '../i18n/I18nContext';
+import { signInWithIdentifier, signUp, passwordIssues, passwordStrong, friendlyAuthError, PW_RULES } from '../services/auth';
 
 export default function AuthScreen({ onAuthed }) {
+  const { t } = useI18n();
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [email, setEmail] = useState(''); // no login pode ser email OU nome
   const [password, setPassword] = useState('');
@@ -28,16 +30,16 @@ export default function AuthScreen({ onAuthed }) {
     try {
       if (isRegister) {
         const { session, needsConfirmation, error } = await signUp(email, password);
-        if (error) setError(friendlyAuthError(error));
-        else if (needsConfirmation) setNotice('Conta criada! Confirma o teu email e depois entra.');
+        if (error) setError(t(friendlyAuthError(error)));
+        else if (needsConfirmation) setNotice(t('auth.confirmEmail'));
         else if (session) onAuthed(session, true); // registo -> conta nova (nome vem depois)
       } else {
         const { session, error } = await signInWithIdentifier(email, password);
-        if (error) setError(friendlyAuthError(error));
+        if (error) setError(t(friendlyAuthError(error)));
         else if (session) onAuthed(session, false); // login -> puxa dados da conta
       }
     } catch (e) {
-      setError('Algo correu mal. Tenta de novo.');
+      setError(t('auth.errGeneric'));
     } finally {
       setLoading(false);
     }
@@ -52,25 +54,24 @@ export default function AuthScreen({ onAuthed }) {
         <Text style={styles.logo}>💪</Text>
         <Text style={styles.title}>Calisthenics Solo</Text>
         <Text style={styles.subtitle}>
-          {isRegister ? 'Cria a tua conta' : 'Entra na tua conta'}
+          {isRegister ? t('auth.createAccount') : t('auth.signIn')}
         </Text>
 
-        {/* Social só no login — no registo escondemos para os campos subirem
-            e não ficarem tapados pelo teclado */}
+        {/* Social only on login — hidden on register so fields rise above the keyboard */}
         {!isRegister && (
           <>
             <TouchableOpacity style={styles.socialBtn} disabled onPress={() => {}}>
-              <Text style={styles.socialText}>Continuar com Google</Text>
-              <Text style={styles.soon}>brevemente</Text>
+              <Text style={styles.socialText}>{t('auth.google')}</Text>
+              <Text style={styles.soon}>{t('auth.soon')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialBtn} disabled onPress={() => {}}>
-              <Text style={styles.socialText}>Continuar com Apple</Text>
-              <Text style={styles.soon}>brevemente</Text>
+              <Text style={styles.socialText}>{t('auth.apple')}</Text>
+              <Text style={styles.soon}>{t('auth.soon')}</Text>
             </TouchableOpacity>
 
             <View style={styles.divider}>
               <View style={styles.line} />
-              <Text style={styles.dividerText}>ou com email</Text>
+              <Text style={styles.dividerText}>{t('auth.orEmail')}</Text>
               <View style={styles.line} />
             </View>
           </>
@@ -78,7 +79,7 @@ export default function AuthScreen({ onAuthed }) {
 
         <TextInput
           style={styles.input}
-          placeholder={isRegister ? 'Email' : 'Email ou nome de utilizador'}
+          placeholder={isRegister ? t('auth.email') : t('auth.emailOrUser')}
           placeholderTextColor={colors.textDim}
           autoCapitalize="none"
           autoCorrect={false}
@@ -89,7 +90,7 @@ export default function AuthScreen({ onAuthed }) {
         <View style={styles.pwRow}>
           <TextInput
             style={styles.pwInput}
-            placeholder="Password"
+            placeholder={t('auth.password')}
             placeholderTextColor={colors.textDim}
             secureTextEntry={!showPassword}
             autoCapitalize="none"
@@ -103,11 +104,11 @@ export default function AuthScreen({ onAuthed }) {
 
         {isRegister && password.length > 0 && (
           <View style={styles.reqBox}>
-            {['pelo menos 8 caracteres', 'uma letra minúscula', 'uma letra maiúscula', 'um número'].map((req) => {
-              const ok = !issues.includes(req);
+            {PW_RULES.map((key) => {
+              const ok = !issues.includes(key);
               return (
-                <Text key={req} style={[styles.req, ok && styles.reqOk]}>
-                  {ok ? '✓' : '○'} {req}
+                <Text key={key} style={[styles.req, ok && styles.reqOk]}>
+                  {ok ? '✓' : '○'} {t(key)}
                 </Text>
               );
             })}
@@ -125,7 +126,7 @@ export default function AuthScreen({ onAuthed }) {
           {loading ? (
             <ActivityIndicator color={colors.onPrimary} />
           ) : (
-            <Text style={styles.submitText}>{isRegister ? 'Criar conta' : 'Entrar'}</Text>
+            <Text style={styles.submitText}>{isRegister ? t('auth.register') : t('auth.login')}</Text>
           )}
         </TouchableOpacity>
 
@@ -133,7 +134,7 @@ export default function AuthScreen({ onAuthed }) {
           onPress={() => { setMode(isRegister ? 'login' : 'register'); setError(''); setNotice(''); }}
         >
           <Text style={styles.switch}>
-            {isRegister ? 'Já tens conta? Entra' : 'Ainda não tens conta? Regista-te'}
+            {isRegister ? t('auth.haveAccount') : t('auth.noAccount')}
           </Text>
         </TouchableOpacity>
       </ScrollView>

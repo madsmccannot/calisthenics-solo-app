@@ -4,13 +4,15 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { colors, radius } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
 import { claimUsername } from '../services/cloudSync';
 
-// Pedida após criar conta (email ou OAuth), quando ainda não há nome definido.
-// O nome é único e é o que aparece para outros no feed.
+// Shown after creating an account (email or OAuth) when no name is set yet.
+// The name is unique and is what others see in the feed.
 const RE = /^[a-zA-Z0-9_.]{3,20}$/;
 
 export default function UsernameScreen({ onDone }) {
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,9 +27,9 @@ export default function UsernameScreen({ onDone }) {
     if (res.ok) {
       onDone(name.trim());
     } else if (res.reason === 'taken') {
-      setError('Esse nome já está em uso. Escolhe outro.');
+      setError(t('username.taken'));
     } else {
-      setError('Não foi possível guardar. Verifica a ligação e tenta de novo.');
+      setError(t('username.saveError'));
     }
   };
 
@@ -38,14 +40,12 @@ export default function UsernameScreen({ onDone }) {
     >
       <View style={styles.container}>
         <Text style={styles.logo}>👋</Text>
-        <Text style={styles.title}>Escolhe um nome</Text>
-        <Text style={styles.subtitle}>
-          É o nome que os outros vão ver no feed. Podes mudá-lo depois.
-        </Text>
+        <Text style={styles.title}>{t('username.title')}</Text>
+        <Text style={styles.subtitle}>{t('username.subtitle')}</Text>
 
         <TextInput
           style={styles.input}
-          placeholder="nome de utilizador"
+          placeholder={t('username.placeholder')}
           placeholderTextColor={colors.textDim}
           autoCapitalize="none"
           autoCorrect={false}
@@ -53,7 +53,7 @@ export default function UsernameScreen({ onDone }) {
           value={name}
           onChangeText={setName}
         />
-        <Text style={styles.hint}>3 a 20 caracteres · letras, números, _ ou .</Text>
+        <Text style={styles.hint}>{t('username.hint')}</Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -65,7 +65,7 @@ export default function UsernameScreen({ onDone }) {
           {loading ? (
             <ActivityIndicator color={colors.onPrimary} />
           ) : (
-            <Text style={styles.btnText}>Continuar</Text>
+            <Text style={styles.btnText}>{t('common.continue')}</Text>
           )}
         </TouchableOpacity>
       </View>

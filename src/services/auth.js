@@ -3,13 +3,15 @@
 
 import { supabase, supabaseEnabled } from './supabase';
 
-// Regra de força da password (a condizer com a policy do Supabase).
+// Password strength (matches the Supabase policy). Returns translation keys.
+export const PW_RULES = ['auth.pw8', 'auth.pwLower', 'auth.pwUpper', 'auth.pwDigit'];
+
 export function passwordIssues(pw = '') {
   const issues = [];
-  if (pw.length < 8) issues.push('pelo menos 8 caracteres');
-  if (!/[a-z]/.test(pw)) issues.push('uma letra minúscula');
-  if (!/[A-Z]/.test(pw)) issues.push('uma letra maiúscula');
-  if (!/[0-9]/.test(pw)) issues.push('um número');
+  if (pw.length < 8) issues.push('auth.pw8');
+  if (!/[a-z]/.test(pw)) issues.push('auth.pwLower');
+  if (!/[A-Z]/.test(pw)) issues.push('auth.pwUpper');
+  if (!/[0-9]/.test(pw)) issues.push('auth.pwDigit');
   return issues;
 }
 export function passwordStrong(pw) {
@@ -54,14 +56,15 @@ export function onAuthChange(cb) {
   return () => data.subscription.unsubscribe();
 }
 
-// Traduz erros do Supabase para PT (mensagens amigáveis).
+// Maps a Supabase auth error to a translation key (the screen calls t()).
 export function friendlyAuthError(error) {
   if (!error) return null;
   const m = (error.message || '').toLowerCase();
-  if (m.includes('invalid login')) return 'Email ou password errados.';
-  if (m.includes('already registered') || m.includes('already exists')) return 'Este email já tem conta.';
-  if (m.includes('password')) return 'A password não cumpre os requisitos.';
-  if (m.includes('email')) return 'Email inválido.';
-  if (m.includes('network') || m.includes('fetch')) return 'Sem ligação. Verifica a internet.';
-  return error.message || 'Algo correu mal. Tenta de novo.';
+  if (m.includes('not found')) return 'auth.errUserNotFound';
+  if (m.includes('invalid login')) return 'auth.errWrong';
+  if (m.includes('already registered') || m.includes('already exists')) return 'auth.errExists';
+  if (m.includes('password')) return 'auth.errPw';
+  if (m.includes('email')) return 'auth.errEmail';
+  if (m.includes('network') || m.includes('fetch')) return 'auth.errNetwork';
+  return 'auth.errGeneric';
 }

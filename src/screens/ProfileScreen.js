@@ -8,7 +8,9 @@ import ConfirmModal from '../components/ConfirmModal';
 import InfoModal from '../components/InfoModal';
 import Avatar from '../components/Avatar';
 import LockerModal from '../components/LockerModal';
+import LanguagePicker from '../components/LanguagePicker';
 import { colors, radius } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
 import { getRegenerableCount, regenerateFuturePlan, getPlanClass } from '../services/planService';
 import { getProgressSummary, getAvatar } from '../services/progressStore';
 import { getStreakData } from '../services/localStore';
@@ -36,6 +38,7 @@ function formatTime(totalSeconds = 0) {
 }
 
 export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPlanChanged, activeTab, onSignOut, email }) {
+  const { t, lang, setLang } = useI18n();
   const [weight, setWeight] = useState(profile?.weight || '');
   const [height, setHeight] = useState(profile?.height || '');
   const [level, setLevel] = useState(profile?.level || 'Iniciante');
@@ -72,7 +75,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
 
   const handleSave = async () => {
     if (!weight || !height) {
-      setInfo({ emoji: '⚠️', title: 'Falta informação', message: 'Preenche o peso e a altura.' });
+      setInfo({ emoji: '⚠️', title: t('profile.missingTitle'), message: t('profile.missingMsg') });
       return;
     }
     const updated = { weight, height, level };
@@ -95,29 +98,29 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
     setRegenerating(false);
     onPlanChanged?.();
     if (changed > 0) {
-      setInfo({ emoji: '✅', title: 'Treinos atualizados', message: `${changed} treinos por fazer foram regerados com a carga de ${level}.` });
+      setInfo({ emoji: '✅', title: t('profile.updatedTitle'), message: t('profile.updatedMsg', { n: changed, level: t('level.' + level) }) });
     } else {
-      setInfo({ emoji: '📡', title: 'Nada foi alterado', message: 'A IA não respondeu a tempo. Verifica a ligação e tenta de novo.' });
+      setInfo({ emoji: '📡', title: t('profile.nothingTitle'), message: t('profile.nothingMsg') });
     }
   };
 
   const evoStats = [
-    { emoji: '⭐', value: summary?.level ?? 1, label: 'Nível' },
-    { emoji: '⚖️', value: profile?.weight ? `${profile.weight}kg` : '—', label: 'Peso' },
-    { emoji: '📊', value: bmi ? bmi.value : '—', label: 'IMC', color: bmi?.color },
-    { emoji: '📅', value: stats.totalWorkouts ?? 0, label: 'Treinos' },
-    { emoji: '🔥', value: streak.current ?? 0, label: 'Streak' },
-    { emoji: '💪', value: stats.totalExercises ?? 0, label: 'Exercícios' },
-    { emoji: '⏱️', value: formatTime(stats.totalSeconds), label: 'Tempo total' },
-    { emoji: '🪙', value: summary?.coins ?? 0, label: 'Moedas', color: colors.gold },
+    { emoji: '⭐', value: summary?.level ?? 1, label: t('profile.statLevel') },
+    { emoji: '⚖️', value: profile?.weight ? `${profile.weight}kg` : '—', label: t('profile.statWeight') },
+    { emoji: '📊', value: bmi ? bmi.value : '—', label: t('profile.statBmi'), color: bmi?.color },
+    { emoji: '📅', value: stats.totalWorkouts ?? 0, label: t('profile.statWorkouts') },
+    { emoji: '🔥', value: streak.current ?? 0, label: t('profile.statStreak') },
+    { emoji: '💪', value: stats.totalExercises ?? 0, label: t('profile.statExercises') },
+    { emoji: '⏱️', value: formatTime(stats.totalSeconds), label: t('profile.statTime') },
+    { emoji: '🪙', value: summary?.coins ?? 0, label: t('profile.statCoins'), color: colors.gold },
   ];
 
   return (
     <>
       <ScrollView style={styles.container}>
-        <Text style={styles.title}>O meu Perfil</Text>
+        <Text style={styles.title}>{t('profile.title')}</Text>
 
-        {/* Identidade / Avatar */}
+        {/* Identity / Avatar */}
         <View style={styles.identityCard}>
           <Avatar avatar={avatar} size={110} />
           <View style={styles.identityInfo}>
@@ -125,7 +128,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
               {displayName || summary?.title || 'Novato'}
             </Text>
             <Text style={styles.identitySub}>
-              Nível {summary?.level ?? 1} · {summary?.title || 'Novato'}
+              {t('profile.statLevel')} {summary?.level ?? 1} · {summary?.title || 'Novato'}
             </Text>
             {email ? (
               <Text style={styles.identityEmail} numberOfLines={1}>{email}</Text>
@@ -137,11 +140,11 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
         </View>
 
         <TouchableOpacity style={styles.lockerBtn} onPress={() => setShowLocker(true)}>
-          <Text style={styles.lockerBtnText}>🎨 Personalizar / Loja</Text>
+          <Text style={styles.lockerBtnText}>{t('profile.customize')}</Text>
         </TouchableOpacity>
 
-        {/* Evolução física */}
-        <Text style={styles.sectionTitle}>Evolução física</Text>
+        {/* Physical evolution */}
+        <Text style={styles.sectionTitle}>{t('profile.evolution')}</Text>
         <View style={styles.evoGrid}>
           {evoStats.map((s) => (
             <View key={s.label} style={styles.evoBox}>
@@ -152,10 +155,10 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
           ))}
         </View>
 
-        {/* Edição de perfil */}
-        <Text style={styles.sectionTitle}>Dados</Text>
+        {/* Profile details */}
+        <Text style={styles.sectionTitle}>{t('profile.data')}</Text>
         <View style={styles.card}>
-          <Text style={styles.label}>Peso (kg)</Text>
+          <Text style={styles.label}>{t('profile.weight')}</Text>
           <TextInput
             style={styles.input}
             keyboardType="numeric"
@@ -165,7 +168,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
             placeholderTextColor="#555"
           />
 
-          <Text style={styles.label}>Altura (cm)</Text>
+          <Text style={styles.label}>{t('profile.height')}</Text>
           <TextInput
             style={styles.input}
             keyboardType="numeric"
@@ -175,7 +178,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
             placeholderTextColor="#555"
           />
 
-          <Text style={styles.label}>Nível de Fitness</Text>
+          <Text style={styles.label}>{t('profile.level')}</Text>
           <View style={styles.levelContainer}>
             {LEVELS.map((l) => (
               <TouchableOpacity
@@ -183,35 +186,41 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
                 style={[styles.levelBtn, level === l && styles.levelBtnActive]}
                 onPress={() => setLevel(l)}
               >
-                <Text style={[styles.levelText, level === l && styles.levelTextActive]}>{l}</Text>
+                <Text style={[styles.levelText, level === l && styles.levelTextActive]}>{t('level.' + l)}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Text style={styles.saveBtnText}>{saved ? '✓ Guardado!' : 'Guardar alterações'}</Text>
+            <Text style={styles.saveBtnText}>{saved ? t('profile.saved') : t('profile.save')}</Text>
           </TouchableOpacity>
 
           {loadDiffers && (
             <TouchableOpacity style={styles.applyLoadBtn} onPress={() => setShowRegenConfirm(true)}>
               <Text style={styles.applyLoadText}>
-                ⚡ Aplicar carga de {level} aos {regenCount} treinos por fazer
+                {t('profile.applyLoad', { level: t('level.' + level), n: regenCount })}
               </Text>
               <Text style={styles.applyLoadSub}>
-                {planClass ? `Plano atual gerado com carga de ${planClass}` : 'Aplica a carga atual ao teu plano existente'}
+                {planClass ? t('profile.applyLoadSub', { level: t('level.' + planClass) }) : t('profile.applyLoadSubOld')}
               </Text>
             </TouchableOpacity>
           )}
         </View>
 
+        {/* Language */}
+        <Text style={styles.sectionTitle}>{t('lang.settingLabel')}</Text>
+        <View style={styles.langCard}>
+          <LanguagePicker value={lang} onSelect={setLang} />
+        </View>
+
         {onSignOut && (
           <TouchableOpacity style={styles.signOutBtn} onPress={onSignOut}>
-            <Text style={styles.signOutText}>Sair da conta</Text>
+            <Text style={styles.signOutText}>{t('profile.signOut')}</Text>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity style={styles.resetBtn} onPress={() => setShowConfirm(true)}>
-          <Text style={styles.resetBtnText}>⚠ Resetar Tudo</Text>
+          <Text style={styles.resetBtnText}>{t('profile.resetAll')}</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -224,10 +233,10 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
       <ConfirmModal
         visible={showConfirm}
         emoji="⚠️"
-        title="Resetar tudo?"
-        message="Isto apaga o teu plano, progresso e streak. Tens a certeza?"
-        confirmText="Resetar"
-        cancelText="Cancelar"
+        title={t('profile.resetTitle')}
+        message={t('profile.resetMsg')}
+        confirmText={t('profile.resetConfirm')}
+        cancelText={t('profile.cancel')}
         confirmColor="#ef4444"
         onConfirm={() => { setShowConfirm(false); onReset(); }}
         onDismiss={() => setShowConfirm(false)}
@@ -236,10 +245,10 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
       <ConfirmModal
         visible={showRegenConfirm}
         emoji="⚡"
-        title="Mudaste de classe"
-        message={`Queres regenerar os ${regenCount} treinos por fazer com a nova carga? Isto usa a IA e pode demorar 1-2 minutos. Os dias já feitos não são afetados.`}
-        confirmText="Regenerar"
-        cancelText="Manter como está"
+        title={t('profile.classChangedTitle')}
+        message={t('profile.classChangedMsg', { n: regenCount })}
+        confirmText={t('profile.regenerate')}
+        cancelText={t('profile.keep')}
         confirmColor="#4ade80"
         onConfirm={handleRegenConfirm}
         onDismiss={() => setShowRegenConfirm(false)}
@@ -249,8 +258,8 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
         <View style={styles.regenOverlay}>
           <View style={styles.regenBox}>
             <ActivityIndicator size="large" color="#4ade80" />
-            <Text style={styles.regenTitle}>A regenerar os treinos...</Text>
-            <Text style={styles.regenSub}>Com a nova carga · pode demorar 1-2 min</Text>
+            <Text style={styles.regenTitle}>{t('profile.regenerating')}</Text>
+            <Text style={styles.regenSub}>{t('profile.regeneratingSub')}</Text>
           </View>
         </View>
       </Modal>
@@ -291,6 +300,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', borderWidth: 1, borderColor: colors.purple, marginBottom: 20,
   },
   lockerBtnText: { color: colors.purple, fontSize: 15, fontWeight: 'bold' },
+  langCard: { marginBottom: 16 },
 
   evoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
   evoBox: {

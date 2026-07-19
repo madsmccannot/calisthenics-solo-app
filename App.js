@@ -11,6 +11,8 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import FeedScreen from './src/screens/FeedScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import UsernameScreen from './src/screens/UsernameScreen';
+import LanguageScreen from './src/screens/LanguageScreen';
+import { useI18n } from './src/i18n/I18nContext';
 import { supabaseEnabled } from './src/services/supabase';
 import { getSession, onAuthChange, signOut } from './src/services/auth';
 import { setSyncUser, freshAuthSync, flushSync, resetCloud, getDisplayName } from './src/services/cloudSync';
@@ -34,11 +36,12 @@ function FadeScreen({ children }) {
 }
 
 function BottomNav({ activeTab, onTabPress }) {
+  const { t } = useI18n();
   const tabs = [
-    { key: 'dashboard', emoji: '🏠', label: 'Plano' },
-    { key: 'feed', emoji: '📣', label: 'Feed' },
-    { key: 'stats', emoji: '📊', label: 'Stats' },
-    { key: 'profile', emoji: '👤', label: 'Perfil' },
+    { key: 'dashboard', emoji: '🏠', label: t('tabs.plan') },
+    { key: 'feed', emoji: '📣', label: t('tabs.feed') },
+    { key: 'stats', emoji: '📊', label: t('tabs.stats') },
+    { key: 'profile', emoji: '👤', label: t('tabs.profile') },
   ];
 
   return (
@@ -84,6 +87,7 @@ export default function App() {
   const [currentStreak, setCurrentStreak] = useState(0);
   const [dashboardKey, setDashboardKey] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const { t, chosen } = useI18n();
   // undefined = ainda a verificar; null = sem sessão; objeto = com sessão
   const [session, setSession] = useState(supabaseEnabled ? undefined : null);
   const [syncing, setSyncing] = useState(false);
@@ -266,6 +270,11 @@ export default function App() {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
+  // First run: pick a language before anything else
+  if (!chosen) {
+    return <LanguageScreen />;
+  }
+
   // Verificação da sessão (Supabase configurado)
   if (supabaseEnabled && session === undefined) {
     return (
@@ -282,7 +291,7 @@ export default function App() {
     return (
       <View style={{ flex: 1, backgroundColor: '#0f0f0f', justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#4ade80" />
-        <Text style={{ color: '#aaaaaa', marginTop: 16 }}>A sincronizar...</Text>
+        <Text style={{ color: '#aaaaaa', marginTop: 16 }}>{t('common.syncing')}</Text>
       </View>
     );
   }
