@@ -276,7 +276,7 @@ function pushFeed(state, event) {
     ...event,
   };
   state.feedEvents = [item, ...(state.feedEvents || [])].slice(0, 50);
-  publishEvent(item); // fire-and-forget: publica no backend se estiver configurado
+  publishEvent(item); // fire-and-forget: publishes to the backend if configured
 }
 
 export async function logFeedEvent(event) {

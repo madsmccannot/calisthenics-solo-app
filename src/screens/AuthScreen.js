@@ -5,17 +5,22 @@ import {
 } from 'react-native';
 import { colors, radius } from '../theme';
 import { useI18n } from '../i18n/I18nContext';
-import { signInWithIdentifier, signUp, passwordIssues, passwordStrong, friendlyAuthError, PW_RULES } from '../services/auth';
+import {
+  signInWithIdentifier, signUp, verifySignupOtp, resendSignup,
+  passwordIssues, passwordStrong, friendlyAuthError, PW_RULES,
+} from '../services/auth';
 
 export default function AuthScreen({ onAuthed }) {
   const { t } = useI18n();
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [email, setEmail] = useState(''); // no login pode ser email OU nome
+  const [email, setEmail] = useState(''); // on login this can be email OR username
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [otpEmail, setOtpEmail] = useState(null); // set -> show OTP confirmation step
+  const [otpCode, setOtpCode] = useState('');
 
   const isRegister = mode === 'register';
   const issues = passwordIssues(password);
@@ -31,8 +36,8 @@ export default function AuthScreen({ onAuthed }) {
       if (isRegister) {
         const { session, needsConfirmation, error } = await signUp(email, password);
         if (error) setError(t(friendlyAuthError(error)));
-        else if (needsConfirmation) setNotice(t('auth.confirmEmail'));
         else if (session) onAuthed(session, true); // register -> new account (name comes later)
+        else if (needsConfirmation) setOtpEmail(email.trim()); // needs email confirmation -> OTP step
       } else {
         const { session, error } = await signInWithIdentifier(email, password);
         if (error) setError(t(friendlyAuthError(error)));
@@ -45,6 +50,27 @@ export default function AuthScreen({ onAuthed }) {
     }
   };
 
+  const verifyOtp = async () => {
+    setError('');
+    setNotice('');
+    setLoading(true);
+    try {
+      const { session, error } = await verifySignupOtp(otpEmail, otpCode);
+      if (error || !session) setError(t('otp.invalid'));
+      else onAuthed(session, true); // confirmed -> new account -> username step
+    } catch (e) {
+      setError(t('otp.invalid'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendOtp = async () => {
+    setError('');
+    await resendSignup(otpEmail);
+    setNotice(t('otp.resent'));
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colors.bg }}
@@ -53,6 +79,43 @@ export default function AuthScreen({ onAuthed }) {
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.logo}>💪</Text>
         <Text style={styles.title}>Calisthenics Solo</Text>
+
+        {otpEmail ? (
+          <>
+            <Text style={styles.subtitle}>{t('otp.title')}</Text>
+            <Text style={styles.otpSub}>{t('otp.sub', { email: otpEmail })}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t('otp.placeholder')}
+              placeholderTextColor={colors.textDim}
+              keyboardType="number-pad"
+              maxLength={8}
+              value={otpCode}
+              onChangeText={setOtpCode}
+              autoFocus
+            />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+            <TouchableOpacity
+              style={[styles.submitBtn, otpCode.trim().length < 4 && styles.submitDisabled]}
+              onPress={verifyOtp}
+              disabled={otpCode.trim().length < 4 || loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.onPrimary} />
+              ) : (
+                <Text style={styles.submitText}>{t('otp.verify')}</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={resendOtp}>
+              <Text style={styles.switch}>{t('otp.resend')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setOtpEmail(null); setOtpCode(''); setError(''); setNotice(''); }}>
+              <Text style={styles.switch}>{t('otp.back')}</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+        <>
         <Text style={styles.subtitle}>
           {isRegister ? t('auth.createAccount') : t('auth.signIn')}
         </Text>
@@ -137,6 +200,8 @@ export default function AuthScreen({ onAuthed }) {
             {isRegister ? t('auth.haveAccount') : t('auth.noAccount')}
           </Text>
         </TouchableOpacity>
+        </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -147,6 +212,7 @@ const styles = StyleSheet.create({
   logo: { fontSize: 56, textAlign: 'center', marginBottom: 8 },
   title: { fontSize: 26, fontWeight: 'bold', color: colors.text, textAlign: 'center' },
   subtitle: { fontSize: 15, color: colors.textMuted, textAlign: 'center', marginTop: 6, marginBottom: 28 },
+  otpSub: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: -18, marginBottom: 24, lineHeight: 20 },
   socialBtn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
     backgroundColor: colors.card, borderRadius: radius.lg, padding: 14, marginBottom: 10,

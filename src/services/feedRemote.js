@@ -39,7 +39,7 @@ export async function fetchOthers(limit = 50) {
         id: String(e.id),
         ts: Number(e.ts) || Date.now(),
         who: 'other',
-        name: e.name || 'Alguém',
+        name: e.name || 'Someone',
         emoji: e.emoji || '💪',
         title: e.title || '',
         subtitle: e.subtitle || undefined,
@@ -60,7 +60,7 @@ export async function fetchOthers(limit = 50) {
       id: String(e.id ?? `${e.ts}-${e.name}`),
       ts: Number(e.ts) || Date.now(),
       who: 'other',
-      name: e.name || 'Alguém',
+      name: e.name || 'Someone',
       emoji: e.emoji || '💪',
       title: e.title || '',
       subtitle: e.subtitle,
@@ -112,7 +112,7 @@ export async function publishEvent(item) {
         subtitle: item.subtitle || null,
       });
     } catch {
-      /* offline / erro — falha silenciosa */
+      /* offline / error — fail silently */
     }
     return;
   }

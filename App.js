@@ -13,8 +13,9 @@ import AuthScreen from './src/screens/AuthScreen';
 import UsernameScreen from './src/screens/UsernameScreen';
 import LanguageScreen from './src/screens/LanguageScreen';
 import { useI18n } from './src/i18n/I18nContext';
+import * as Linking from 'expo-linking';
 import { supabaseEnabled } from './src/services/supabase';
-import { getSession, onAuthChange, signOut } from './src/services/auth';
+import { getSession, onAuthChange, signOut, handleAuthUrl } from './src/services/auth';
 import { setSyncUser, freshAuthSync, flushSync, resetCloud, getDisplayName } from './src/services/cloudSync';
 import { updateStreak, getWeightLog } from './src/services/localStore';
 import { completeWorkout, checkMedals, getSeason, advanceSeason, logFeedEvent } from './src/services/progressStore';
@@ -148,6 +149,20 @@ export default function App() {
     setSession(null);
     setUsername(null);
   };
+
+  // Email-confirmation / magic-link deep links: complete the session in-app.
+  useEffect(() => {
+    if (!supabaseEnabled) return;
+    let active = true;
+    const process = async (url) => {
+      if (!url || !active) return;
+      const res = await handleAuthUrl(url);
+      if (res?.session) handleFreshAuth(res.session, false);
+    };
+    Linking.getInitialURL().then(process);
+    const sub = Linking.addEventListener('url', (e) => process(e.url));
+    return () => { active = false; sub.remove(); };
+  }, []);
 
   useEffect(() => {
     const backAction = () => {
