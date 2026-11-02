@@ -37,6 +37,14 @@
   filter on `eligibleExercises`, and an `exercisesByMuscle` query. Catalogue
   integrity tests (`__tests__/catalogue.test.js`, 10 tests). Purely additive —
   no change to plan-generation behavior.
+- Phase 4 (step 1/3) — Progression & Feedback Engine core
+  (`src/domain/progression.js`): pure, per-exercise, earned from a subjective
+  difficulty signal (easy/ok/hard), bounded and explainable, never time- or
+  season-based. Every exposure is a generic `outcome`; `normalizeOutcome` is the
+  single extension point, so Stage 2 objective metrics (actual reps, hold
+  duration, sets, per-exercise history) plug in without rewriting the engine (a
+  forward-compat test proves the objective path already decides identically).
+  12 tests (`__tests__/progression.test.js`). Not yet wired to the UI/generator.
 
 ### Changed
 - `planService.js` uses the deterministic generator as a fallback and skips the
