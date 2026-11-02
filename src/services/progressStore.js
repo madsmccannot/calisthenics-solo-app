@@ -9,6 +9,7 @@ import { MEDALS } from '../config/medals';
 import { getItem, DEFAULT_OWNED, SLOTS, defaultItemForSlot } from '../config/shopCatalog';
 import { publishEvent } from './feedRemote';
 import { scheduleSync } from './cloudSync';
+import { withGameLock } from './gameStateLock';
 
 const GAME_KEY = 'gameState';
 
@@ -127,6 +128,7 @@ export async function getProgressSummary() {
 
 // ---------- XP and coins ----------
 export async function addXp(amount) {
+  return withGameLock(async () => {
   const state = await getGameState();
   const before = getLevelInfo(state.xp);
   state.xp += amount;
@@ -141,13 +143,16 @@ export async function addXp(amount) {
     levelInfo: after,
     title: titleForLevel(after.level),
   };
+  });
 }
 
 export async function addCoins(amount) {
+  return withGameLock(async () => {
   const state = await getGameState();
   state.coins += amount;
   await save(state);
   return state.coins;
+  });
 }
 
 // Closes a workout: adds XP (exercises + bonus + streak), records stats and
@@ -162,6 +167,7 @@ export async function completeWorkout({
   seconds = 0,
   repsById = {},
 }) {
+  return withGameLock(async () => {
   const state = await getGameState();
 
   // Idempotency: a given workout (season + day) may only be rewarded once.
@@ -218,6 +224,7 @@ export async function completeWorkout({
     title: titleForLevel(after.level),
     coins: state.coins,
   };
+  });
 }
 
 // ---------- Missions ----------
@@ -239,24 +246,29 @@ function ensureMissions(state) {
 }
 
 export async function getDailyMissions() {
+  return withGameLock(async () => {
   const state = await getGameState();
   const before = JSON.stringify(state.missions);
   ensureMissions(state);
   if (JSON.stringify(state.missions) !== before) await save(state);
   return state.missions;
+  });
 }
 
 export async function toggleMission(id) {
+  return withGameLock(async () => {
   const state = await getGameState();
   ensureMissions(state);
   const item = state.missions.items.find((i) => i.id === id);
   if (item && !item.auto) item.done = !item.done;
   await save(state);
   return state.missions;
+  });
 }
 
 // Claims the daily missions reward (only if all are complete).
 export async function claimMissions() {
+  return withGameLock(async () => {
   const state = await getGameState();
   ensureMissions(state);
   const m = state.missions;
@@ -280,6 +292,7 @@ export async function claimMissions() {
     levelInfo: after,
     title: titleForLevel(after.level),
   };
+  });
 }
 
 // Simple XP (used by recovery days).
@@ -300,9 +313,11 @@ function pushFeed(state, event) {
 }
 
 export async function logFeedEvent(event) {
+  return withGameLock(async () => {
   const state = await getGameState();
   pushFeed(state, event);
   await save(state);
+  });
 }
 
 export async function getFeedEvents() {
@@ -315,10 +330,12 @@ export async function getSeason() {
 }
 
 export async function advanceSeason() {
+  return withGameLock(async () => {
   const state = await getGameState();
   state.season = (state.season || 1) + 1;
   await save(state);
   return state.season;
+  });
 }
 
 // Season tier i18n key: 1-3 numbered, then Elite/Master/Legend.
@@ -332,12 +349,14 @@ export function seasonTier(season = 1) {
 // Marks the day's workout mission as done without crediting workout XP
 // (used when a recovery day is completed).
 export async function markWorkoutMissionForToday() {
+  return withGameLock(async () => {
   const state = await getGameState();
   ensureMissions(state);
   const wm = state.missions.items.find((i) => i.id === 'workout');
   if (wm) wm.done = true;
   await save(state);
   return state.missions;
+  });
 }
 
 // ---------- Medals ----------
@@ -355,6 +374,7 @@ function buildMedalContext(state, { streak, weightLog }) {
 // `t` is the translator (optional): the medal's feed event is created in the
 // user's current language at unlock time.
 export async function checkMedals({ streak, weightLog, t } = {}) {
+  return withGameLock(async () => {
   const state = await getGameState();
   const ctx = buildMedalContext(state, { streak, weightLog });
   const newly = [];
@@ -370,6 +390,7 @@ export async function checkMedals({ streak, weightLog, t } = {}) {
   }
   if (newly.length) await save(state);
   return newly;
+  });
 }
 
 // ---------- Shop / Avatar ----------
@@ -406,6 +427,7 @@ export async function getAvatar() {
 }
 
 export async function buyItem(itemId) {
+  return withGameLock(async () => {
   const state = await getGameState();
   const item = getItem(itemId);
   if (!item) return { ok: false, reason: 'invalid' };
@@ -417,15 +439,18 @@ export async function buyItem(itemId) {
   state.avatar = { ...normalizeAvatar(state.avatar, ownedSet(state)), [item.slot]: itemId };
   await save(state);
   return { ok: true, coins: state.coins };
+  });
 }
 
 export async function equipItem(slot, itemId) {
+  return withGameLock(async () => {
   const state = await getGameState();
   const item = getItem(itemId);
   if (!item || item.slot !== slot || !ownedSet(state).has(itemId)) return null;
   state.avatar = { ...normalizeAvatar(state.avatar, ownedSet(state)), [slot]: itemId };
   await save(state);
   return state.avatar;
+  });
 }
 
 // Full list of medals with their unlock state (for the wall).

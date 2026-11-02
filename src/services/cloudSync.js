@@ -6,6 +6,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, supabaseEnabled } from './supabase';
+import { withGameLock } from './gameStateLock';
 
 const K = {
   profile: 'userProfile',
@@ -242,10 +243,15 @@ export async function pullSnapshot() {
     }
 
     if (prog.data) {
-      // preserve any local feed milestones instead of wiping them
-      let prevFeed = [];
-      try { prevFeed = JSON.parse((await AsyncStorage.getItem(K.game)) || 'null')?.feedEvents || []; } catch {}
-      await AsyncStorage.setItem(K.game, JSON.stringify(rowToGame(prog.data, prevFeed)));
+      // Overwrite the local gameState under the same lock as local mutations, so
+      // a pull can't land between a local read and its write (and vice-versa).
+      // Reading the current feed and writing the merged state must be one atomic
+      // step, otherwise a feed milestone logged in between would be lost.
+      await withGameLock(async () => {
+        let prevFeed = [];
+        try { prevFeed = JSON.parse((await AsyncStorage.getItem(K.game)) || 'null')?.feedEvents || []; } catch {}
+        await AsyncStorage.setItem(K.game, JSON.stringify(rowToGame(prog.data, prevFeed)));
+      });
     }
     if (plan.data?.days) {
       await AsyncStorage.setItem(K.plan, JSON.stringify(plan.data.days));
