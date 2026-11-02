@@ -22,6 +22,21 @@
 - Security tests (`__tests__/authSecurity.test.js`, 5 tests): username login
   never resolves an email client-side, and the Gemini key is not hard-wired
   into the request URL.
+- Concurrency safety for the `gameState` record: a shared single-writer queue
+  (`src/services/gameStateLock.js`) serializes every read-modify-write so
+  overlapping local actions — and a cloud pull landing mid-write — can no longer
+  silently discard each other's progress (lost-update bug). Regression tests
+  (`__tests__/concurrency.test.js`, 4 tests) fail without the queue and pass
+  with it. Closes the remaining Phase 1 exit criterion.
+- Phase 2 — Exercise Knowledge Base: the 14 catalogue records now carry
+  structured metadata (equipment, primary/secondary muscles, unilateral flag,
+  execution cues, regression/progression relationships, review status) with
+  controlled vocabularies (`EQUIPMENT`, `MUSCLES`). Added `validateCatalogue()`
+  (ids unique, animations/patterns/tiers/types/muscles valid, relationships
+  resolve and increase in difficulty, all five locales present), an equipment
+  filter on `eligibleExercises`, and an `exercisesByMuscle` query. Catalogue
+  integrity tests (`__tests__/catalogue.test.js`, 10 tests). Purely additive —
+  no change to plan-generation behavior.
 
 ### Changed
 - `planService.js` uses the deterministic generator as a fallback and skips the
