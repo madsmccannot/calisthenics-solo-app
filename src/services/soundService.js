@@ -1,17 +1,32 @@
-import { Audio } from 'expo-av';
 
-export async function playBeep() {
+import { createAudioPlayer } from 'expo-audio';
+
+const BEEP_SOURCE =
+  'https://actions.google.com/sounds/v1/alarms/beep_short.ogg';
+
+export function playBeep() {
+  let player;
+  let subscription;
+
   try {
-    const { sound } = await Audio.Sound.createAsync(
-      { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' },
-      { shouldPlay: true }
-    );
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.didJustFinish) {
-        sound.unloadAsync();
-      }
+    player = createAudioPlayer(BEEP_SOURCE, {
+      updateInterval: 100,
     });
-  } catch (e) {
-    console.log('Erro no beep:', e);
+
+    subscription = player.addListener(
+      'playbackStatusUpdate',
+      (status) => {
+        if (status.didJustFinish || status.error) {
+          subscription?.remove();
+          player.release();
+        }
+      }
+    );
+
+    player.play();
+  } catch (error) {
+    subscription?.remove();
+    player?.release();
+    console.warn('Error playing beep:', error);
   }
 }

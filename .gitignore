@@ -45,3 +45,10 @@ yarn-error.*
 *.jpeg
 *.Zone.Identifier
 *.swp
+*.jpg
+*.png
+
+# specific intern info
+DEVELOPMENT_RULES.md
+PROJECT_OVERVIEW.md
+TECHNICAL_ROADMAP.md
