@@ -77,6 +77,59 @@ function num(v) {
   return isNaN(n) ? null : n;
 }
 
+// Surfaces a sync error instead of swallowing it. Sanitized: op name + message
+// only — never the payload, tokens or personal data.
+function reportSyncError(op, error) {
+  if (!error) return false;
+  const msg = error.message || error.code || String(error);
+  if (typeof console !== 'undefined' && console.warn) console.warn(`[sync] ${op}: ${msg}`);
+  return true;
+}
+
+// PostgREST `in` value list, each item double-quoted: ("01/01","02/01").
+export function pgDateList(dates = []) {
+  const items = (dates || []).map((d) => `"${String(d).replace(/"/g, '')}"`);
+  return `(${items.join(',')})`;
+}
+
+// Pure mappers between local gameState and the `progress` table row.
+export function gameToRow(game = {}) {
+  return {
+    xp: game.xp || 0,
+    coins: game.coins || 0,
+    season: game.season || 1,
+    avatar: game.avatar || {},
+    owned_items: game.ownedItems || [],
+    medals: game.medals || {},
+    stats: game.stats || {},
+    missions: game.missions || null,
+    rewarded_workouts: game.rewardedWorkouts || {},
+  };
+}
+
+export function rowToGame(row = {}, prevFeed = []) {
+  return {
+    version: 1,
+    xp: row.xp || 0,
+    coins: row.coins || 0,
+    season: row.season || 1,
+    avatar: row.avatar || {},
+    ownedItems: row.owned_items || [],
+    medals: row.medals || {},
+    stats: row.stats || {},
+    missions: row.missions || null,
+    rewardedWorkouts: row.rewarded_workouts || {},
+    // Never discard local feed history on a pull.
+    feedEvents: Array.isArray(prevFeed) ? prevFeed : [],
+  };
+}
+
+// True when the last push left unsent changes (retried on reconnect/foreground).
+let pendingPush = false;
+export function hasPendingSync() {
+  return pendingPush;
+}
+
 async function readLocal() {
   const [profile, game, plan, planClass, streak, weight, displayName] = await Promise.all([
     AsyncStorage.getItem(K.profile),
@@ -100,63 +153,75 @@ async function readLocal() {
 }
 
 // ── push the local state to the cloud ─────────────────────────────────────
+// Non-destructive: every record is upserted (never delete-then-recreate), each
+// operation's error is inspected and surfaced, and any failure marks the sync
+// pending so it is retried. Returns { ok, failed }.
 export async function pushSnapshot() {
-  if (!supabaseEnabled || !currentUserId) return;
+  if (!supabaseEnabled || !currentUserId) return { ok: true, skipped: true };
   const uid = currentUserId;
   const d = await readLocal();
   const now = new Date().toISOString();
-  try {
-    if (d.profile || d.displayName) {
-      const upd = { updated_at: now };
-      if (d.profile) {
-        upd.weight = num(d.profile.weight);
-        upd.height = num(d.profile.height);
-        upd.class = d.profile.level || 'Iniciante';
-      }
-      if (d.displayName) upd.display_name = d.displayName;
-      await supabase.from('profiles').update(upd).eq('id', uid);
+  const failed = [];
+
+  const run = async (op, builder) => {
+    try {
+      const { error } = (await builder) || {};
+      if (error) { reportSyncError(op, error); failed.push(op); }
+    } catch (e) {
+      reportSyncError(op, e); failed.push(op);
     }
-    if (d.game) {
-      await supabase.from('progress').upsert({
-        user_id: uid,
-        xp: d.game.xp || 0,
-        coins: d.game.coins || 0,
-        season: d.game.season || 1,
-        avatar: d.game.avatar || {},
-        owned_items: d.game.ownedItems || [],
-        medals: d.game.medals || {},
-        stats: d.game.stats || {},
-        missions: d.game.missions || null,
-        updated_at: now,
-      });
+  };
+
+  if (d.profile || d.displayName) {
+    const upd = { updated_at: now };
+    if (d.profile) {
+      upd.weight = num(d.profile.weight);
+      upd.height = num(d.profile.height);
+      upd.class = d.profile.level || 'Iniciante';
     }
-    if (d.plan) {
-      await supabase.from('plans').upsert({
-        user_id: uid,
-        season: d.game?.season || 1,
-        plan_class: d.planClass,
-        days: d.plan,
-        updated_at: now,
-      });
-    }
-    if (d.streak) {
-      await supabase.from('streaks').upsert({
-        user_id: uid,
-        current: d.streak.current || 0,
-        best: d.streak.best || 0,
-        last_completed_date: d.streak.lastCompletedDate || null,
-      });
-    }
-    // weight: replace everything (simple and correct)
-    await supabase.from('weight_log').delete().eq('user_id', uid);
-    if (Array.isArray(d.weight) && d.weight.length) {
-      await supabase.from('weight_log').insert(
-        d.weight.map((w) => ({ user_id: uid, date: w.date, weight: num(w.weight) }))
-      );
-    }
-  } catch {
-    // offline / error -> the next sync sends the latest state
+    if (d.displayName) upd.display_name = d.displayName;
+    await run('profiles', supabase.from('profiles').update(upd).eq('id', uid));
   }
+  if (d.game) {
+    await run('progress', supabase.from('progress').upsert({ user_id: uid, ...gameToRow(d.game), updated_at: now }));
+  }
+  if (d.plan) {
+    await run('plans', supabase.from('plans').upsert({
+      user_id: uid,
+      season: d.game?.season || 1,
+      plan_class: d.planClass,
+      days: d.plan,
+      updated_at: now,
+    }));
+  }
+  if (d.streak) {
+    await run('streaks', supabase.from('streaks').upsert({
+      user_id: uid,
+      current: d.streak.current || 0,
+      best: d.streak.best || 0,
+      last_completed_date: d.streak.lastCompletedDate || null,
+    }));
+  }
+
+  // weight_log: upsert the current entries first (so nothing is lost if a later
+  // step fails), then prune ONLY the rows the user removed — never delete-all.
+  const weight = Array.isArray(d.weight) ? d.weight : [];
+  if (weight.length) {
+    await run('weight_log.upsert', supabase.from('weight_log').upsert(
+      weight.map((w) => ({ user_id: uid, date: w.date, weight: num(w.weight) })),
+      { onConflict: 'user_id,date' }
+    ));
+    await run('weight_log.prune', supabase
+      .from('weight_log').delete().eq('user_id', uid)
+      .not('date', 'in', pgDateList(weight.map((w) => w.date))));
+  } else {
+    // no local entries -> the user cleared them; drop the cloud copies
+    await run('weight_log.clear', supabase.from('weight_log').delete().eq('user_id', uid));
+  }
+
+  const ok = failed.length === 0;
+  pendingPush = !ok;
+  return { ok, failed };
 }
 
 // ── pull the state from the cloud into local ──────────────────────────────
@@ -172,19 +237,15 @@ export async function pullSnapshot() {
       supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
     ]);
 
+    for (const [op, r] of [['progress', prog], ['plans', plan], ['streaks', streak], ['weight_log', weight], ['profiles', prof]]) {
+      if (r && r.error) reportSyncError(`pull.${op}`, r.error);
+    }
+
     if (prog.data) {
-      await AsyncStorage.setItem(K.game, JSON.stringify({
-        version: 1,
-        xp: prog.data.xp || 0,
-        coins: prog.data.coins || 0,
-        season: prog.data.season || 1,
-        avatar: prog.data.avatar || {},
-        ownedItems: prog.data.owned_items || [],
-        medals: prog.data.medals || {},
-        stats: prog.data.stats || {},
-        missions: prog.data.missions || null,
-        feedEvents: [],
-      }));
+      // preserve any local feed milestones instead of wiping them
+      let prevFeed = [];
+      try { prevFeed = JSON.parse((await AsyncStorage.getItem(K.game)) || 'null')?.feedEvents || []; } catch {}
+      await AsyncStorage.setItem(K.game, JSON.stringify(rowToGame(prog.data, prevFeed)));
     }
     if (plan.data?.days) {
       await AsyncStorage.setItem(K.plan, JSON.stringify(plan.data.days));
@@ -212,8 +273,8 @@ export async function pullSnapshot() {
     if (prof.data?.display_name) {
       await AsyncStorage.setItem('displayName', prof.data.display_name);
     }
-  } catch {
-    // offline / error -> keep whatever is in local
+  } catch (e) {
+    reportSyncError('pull', e); // offline / error -> keep whatever is in local
   }
 }
 
@@ -248,6 +309,12 @@ export function scheduleSync() {
   if (!supabaseEnabled || !currentUserId) return;
   clearTimeout(timer);
   timer = setTimeout(() => { pushSnapshot(); }, 2500);
+}
+
+// Retries a previously failed push (e.g. on reconnect / app foreground).
+export async function retrySync() {
+  if (!supabaseEnabled || !currentUserId || !pendingPush) return;
+  await pushSnapshot();
 }
 
 // Push now (e.g. app going to background).

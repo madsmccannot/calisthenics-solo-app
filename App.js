@@ -16,7 +16,7 @@ import { useI18n } from './src/i18n/I18nContext';
 import * as Linking from 'expo-linking';
 import { supabaseEnabled } from './src/services/supabase';
 import { getSession, onAuthChange, signOut, handleAuthUrl } from './src/services/auth';
-import { setSyncUser, freshAuthSync, flushSync, resetCloud, getDisplayName } from './src/services/cloudSync';
+import { setSyncUser, freshAuthSync, flushSync, resetCloud, getDisplayName, retrySync } from './src/services/cloudSync';
 import { updateStreak, getWeightLog } from './src/services/localStore';
 import { completeWorkout, checkMedals, getSeason, advanceSeason, logFeedEvent } from './src/services/progressStore';
 import { xpBreakdown, COMPLETION_BONUS } from './src/config/xpTable';
@@ -121,6 +121,7 @@ export default function App() {
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'background') flushSync();
+      else if (s === 'active') retrySync(); // retry a push that failed offline
     });
     return () => sub.remove();
   }, []);
@@ -187,6 +188,15 @@ export default function App() {
     const saved = await AsyncStorage.getItem('workoutPlan');
     if (saved) {
       const plan = JSON.parse(saved);
+      // Idempotency backstop: if this day is already completed, this is a
+      // duplicate submission. Do not re-award anything — return to the dashboard.
+      const already = plan.find((d) => d.day_number === currentWorkout.day_number);
+      if (already?.completed) {
+        setCurrentWorkout(null);
+        setActiveTab('dashboard');
+        setDashboardKey((k) => k + 1);
+        return;
+      }
       const updated = plan.map((day) =>
         day.day_number === currentWorkout.day_number
           ? { ...day, completed: true }
@@ -222,6 +232,7 @@ export default function App() {
       }, {});
 
     const result = await completeWorkout({
+      dayNumber: currentWorkout.day_number,
       exercisesXp,
       bonus: COMPLETION_BONUS,
       streak: streakData.current,

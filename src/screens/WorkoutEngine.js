@@ -18,6 +18,7 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
   const intervalRef = useRef(null);
   const progressAnim = useRef(new Animated.Value(1)).current;
   const currentIndexRef = useRef(0);
+  const completedRef = useRef(false); // guards against a double onComplete()
 
   const exercises = workout?.exercises || [];
   const current = exercises[currentIndex];
@@ -55,6 +56,8 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
     // credit the XP of the exercise just completed
     setEarnedXp((prev) => prev + xpForExercise(exercises[idx], className));
     if (last) {
+      if (completedRef.current) return; // already finished — don't award twice
+      completedRef.current = true;
       playBeep();
       setTimeout(() => playBeep(), 400);
       onComplete();

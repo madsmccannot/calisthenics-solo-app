@@ -66,20 +66,38 @@ export async function handleAuthUrl(url) {
   }
 }
 
-// Login by email OR username. If it's not an email, resolve the email
-// from the name (via a server RPC) and then sign in with the password.
+// Login by email OR username.
+// - email: a normal client-side password sign-in.
+// - username: resolved by a SECURE Edge Function (`login-username`) that looks
+//   up the email server-side and only returns a session when the password is
+//   correct. The email is NEVER exposed to the client, and failures are generic
+//   so a username cannot be enumerated. Requires the function to be deployed
+//   (see docs/SECURITY.md); if it is not, username login fails closed.
 export async function signInWithIdentifier(identifier, password) {
-  let email = (identifier || '').trim();
-  if (!email.includes('@')) {
-    const { data, error } = await supabase.rpc('email_for_username', { uname: email });
-    if (error || !data) {
-      // English message so friendlyAuthError maps it to auth.errUserNotFound.
-      return { session: null, error: { message: 'User not found.' } };
-    }
-    email = data;
+  const id = (identifier || '').trim();
+
+  if (id.includes('@')) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email: id, password });
+    return { session: data?.session ?? null, error };
   }
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  return { session: data?.session ?? null, error };
+
+  try {
+    const { data, error } = await supabase.functions.invoke('login-username', {
+      body: { username: id, password },
+    });
+    if (error || !data?.access_token) {
+      // Generic message -> friendlyAuthError maps it to auth.errWrong (no
+      // "user exists?" signal leaks to the client).
+      return { session: null, error: { message: 'Invalid login credentials.' } };
+    }
+    const { data: sess, error: setErr } = await supabase.auth.setSession({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+    });
+    return { session: sess?.session ?? null, error: setErr };
+  } catch (e) {
+    return { session: null, error: { message: 'Invalid login credentials.' } };
+  }
 }
 
 // Confirms a signup with the 6-digit code from the email (no deep link needed).

@@ -3,7 +3,8 @@
 // — completed days and rest days stay intact.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { generateWorkoutPlan } from './geminiService';
+import { generateWorkoutPlan, geminiConfigured } from './geminiService';
+import { buildWorkout } from '../domain/planGenerator';
 import { scheduleSync } from './cloudSync';
 
 const PLAN_KEY = 'workoutPlan';
@@ -23,7 +24,8 @@ async function generateWithRetry(profile, dayNumber, season, lang) {
 }
 
 // Generates a full season plan (30 days), anchored to `startDate`.
-// Recovery every 7th day. Days the AI fails on stay empty (Dashboard warns).
+// Recovery every 7th day. Each workout day comes from the AI when a key is set,
+// otherwise (or on AI failure) from the deterministic generator — never empty.
 // ALWAYS returns 30 days and saves plan + start date + class.
 export async function generateSeasonPlan(profile, season = 1, startDate = new Date(), lang = 'en') {
   const startD = new Date(startDate);
@@ -39,14 +41,17 @@ export async function generateSeasonPlan(profile, season = 1, startDate = new Da
       plan.push({ day_number: i, date: iso, workout_type: 'Recovery', exercises: [], completed: false });
       continue;
     }
-    const w = await generateWithRetry(profile, i, season, lang);
+    // AI is optional: only try the network when a key is configured, otherwise
+    // go straight to the deterministic generator (offline-first).
+    const w = geminiConfigured ? await generateWithRetry(profile, i, season, lang) : null;
     if (w) {
       plan.push({ ...w, day_number: i, date: iso, completed: false });
+      await sleep(1200); // space out AI calls to dodge the rate limit
     } else {
-      // placeholder — always keeps 30 days; the user can re-apply the load
-      plan.push({ day_number: i, date: iso, workout_type: 'Strength', exercises: [], completed: false });
+      // deterministic fallback — a valid workout with real exercises, no network
+      const local = buildWorkout(profile, i, season, lang);
+      plan.push({ ...local, day_number: i, date: iso, completed: false });
     }
-    await sleep(1200);
   }
 
   await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(plan));
@@ -114,22 +119,29 @@ export async function regenerateFuturePlan(profile, lang = 'en') {
   let changed = 0;
   for (const day of plan) {
     if (isRegenerable(day)) {
-      let workout = await generateWorkoutPlan(profile, day.day_number, 1, lang);
-      if (!workout) {
-        // likely rate-limit: wait and try a second time
-        await sleep(5000);
+      let workout = null;
+      if (geminiConfigured) {
         workout = await generateWorkoutPlan(profile, day.day_number, 1, lang);
+        if (!workout) {
+          // likely rate-limit: wait and try a second time
+          await sleep(5000);
+          workout = await generateWorkoutPlan(profile, day.day_number, 1, lang);
+        }
+      }
+      if (!workout) {
+        // deterministic fallback so a class change still takes effect offline
+        workout = buildWorkout(profile, day.day_number, 1, lang);
       }
       if (workout) {
-        // pin the original day_number/date — Gemini returns its own day_number
+        // pin the original day_number/date — the AI returns its own day_number
         // (often the example's, 1), which duplicated keys.
         updated.push({ ...workout, day_number: day.day_number, date: day.date, completed: false });
         changed += 1;
-        await sleep(1500); // space out calls to avoid the rate limit
+        if (geminiConfigured) await sleep(1500); // space out AI calls
         continue;
       }
     }
-    updated.push(day); // AI failure or protected day -> keep the original
+    updated.push(day); // protected day (completed/recovery) -> keep the original
   }
 
   await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(updated));

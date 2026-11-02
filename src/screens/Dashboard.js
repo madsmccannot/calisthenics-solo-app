@@ -180,6 +180,8 @@ export default function Dashboard({ profile, onStartWorkout }) {
               key={day.day_number}
               style={getCardStyle(day)}
               onPress={() => {
+                // Completed days cannot be replayed (idempotency guard).
+                if (day.completed) return;
                 if (day.workout_type === 'Recovery') {
                   setRecoveryDay(day);
                   return;

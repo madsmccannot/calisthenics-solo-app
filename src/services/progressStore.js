@@ -28,6 +28,7 @@ const DEFAULT_STATE = {
   },
   ownedItems: [], // shop purchases
   missions: null, // { date, items:[...], claimed }
+  rewardedWorkouts: {}, // { "season:dayNumber": unlockedAtISO } — idempotency ledger
   feedEvents: [], // the user's own Feed milestones (most recent first)
   stats: {
     totalWorkouts: 0,
@@ -152,6 +153,7 @@ export async function addCoins(amount) {
 // Closes a workout: adds XP (exercises + bonus + streak), records stats and
 // marks the workout mission as done. A single read/write.
 export async function completeWorkout({
+  dayNumber = null,
   exercisesXp = 0,
   bonus = 0,
   streak = 0,
@@ -161,6 +163,20 @@ export async function completeWorkout({
   repsById = {},
 }) {
   const state = await getGameState();
+
+  // Idempotency: a given workout (season + day) may only be rewarded once.
+  // A duplicate submission (re-entry, double-tap, replay) is a no-op.
+  const key = dayNumber != null ? `${state.season}:${dayNumber}` : null;
+  if (key && state.rewardedWorkouts && state.rewardedWorkouts[key]) {
+    const info = getLevelInfo(state.xp);
+    return {
+      duplicate: true,
+      total: 0, exercisesXp: 0, bonus: 0, streakBonus: 0, coinsEarned: 0,
+      leveledUp: false, fromLevel: info.level, toLevel: info.level,
+      levelInfo: info, title: titleForLevel(info.level), coins: state.coins,
+    };
+  }
+
   const before = getLevelInfo(state.xp);
   const sBonus = streakBonus(streak);
   const total = exercisesXp + bonus + sBonus;
@@ -182,6 +198,10 @@ export async function completeWorkout({
   ensureMissions(state);
   const wm = state.missions.items.find((i) => i.id === 'workout');
   if (wm) wm.done = true;
+
+  if (key) {
+    state.rewardedWorkouts = { ...(state.rewardedWorkouts || {}), [key]: new Date().toISOString() };
+  }
 
   await save(state);
   const after = getLevelInfo(state.xp);

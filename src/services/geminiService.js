@@ -1,5 +1,46 @@
-const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+import { supabase, supabaseEnabled } from './supabase';
+
+// SECURITY: the Gemini API key is a billable secret and must NOT ship in the
+// client bundle. Production calls go through a Supabase Edge Function proxy
+// (`gemini-proxy`) that holds the key as a SERVER secret (see docs/SECURITY.md).
+// The direct EXPO_PUBLIC key path exists ONLY for local development.
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const DEV_GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY; // dev-only, do not ship
+const PROXY_ENABLED = process.env.EXPO_PUBLIC_GEMINI_PROXY === '1' && supabaseEnabled;
+let warnedDevKey = false;
+
+// Sends a Gemini request body and returns the parsed JSON (or null on failure).
+// Prefers the secure proxy; the direct key call is a dev-only fallback.
+async function callGemini(requestBody) {
+  if (PROXY_ENABLED) {
+    try {
+      const { data, error } = await supabase.functions.invoke('gemini-proxy', { body: requestBody });
+      if (error) { console.warn('[gemini] proxy error:', error.message || String(error)); return null; }
+      return data;
+    } catch (e) {
+      console.warn('[gemini] proxy call failed:', e?.message || String(e));
+      return null;
+    }
+  }
+  if (DEV_GEMINI_KEY) {
+    if (!warnedDevKey) {
+      console.warn('[gemini] using EXPO_PUBLIC_GEMINI_API_KEY directly — DEV ONLY. Do not ship a release build with this key; deploy the gemini-proxy Edge Function and set EXPO_PUBLIC_GEMINI_PROXY=1.');
+      warnedDevKey = true;
+    }
+    const res = await fetch(`${GEMINI_BASE}?key=${DEV_GEMINI_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+    const data = await res.json();
+    if (!res.ok || data?.error) {
+      console.error('Gemini API error', res.status, JSON.stringify(data?.error || data).slice(0, 300));
+      return null;
+    }
+    return data;
+  }
+  return null; // no AI configured -> caller uses the deterministic generator
+}
 
 // Language code -> language name for the prompt, so the AI writes the exercise
 // display names in the app's current language (the id stays the same).
@@ -99,33 +140,24 @@ ${guidance}
 `;
 
   try {
-    const response = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: SYSTEM_PROMPT + '\n\n' + userPrompt }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.95,
-          maxOutputTokens: 2048,
-          responseMimeType: 'application/json', // pure JSON output, no markdown
-          thinkingConfig: { thinkingBudget: 0 }, // disable 2.5-flash "thinking"
+    const data = await callGemini({
+      contents: [
+        {
+          parts: [
+            { text: SYSTEM_PROMPT + '\n\n' + userPrompt }
+          ]
         }
-      })
+      ],
+      generationConfig: {
+        temperature: 0.95,
+        maxOutputTokens: 2048,
+        responseMimeType: 'application/json', // pure JSON output, no markdown
+        thinkingConfig: { thinkingBudget: 0 }, // disable 2.5-flash "thinking"
+      }
     });
 
-    const data = await response.json();
-
-    // API error (quota, invalid key, 429...) -> return the reason, don't crash
-    if (!response.ok || data?.error) {
-      console.error('Gemini API error', response.status, JSON.stringify(data?.error || data).slice(0, 300));
-      return null;
-    }
+    // no data -> proxy/dev call failed or AI not configured; caller falls back
+    if (!data) return null;
 
     // Defensive parse: no parts/text won't crash, logs the finishReason
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -153,3 +185,7 @@ ${guidance}
     return null;
   }
 }
+
+// True when AI generation is available (secure proxy, or a dev key). When false,
+// callers skip the network and use the deterministic generator (offline-first).
+export const geminiConfigured = PROXY_ENABLED || !!DEV_GEMINI_KEY;

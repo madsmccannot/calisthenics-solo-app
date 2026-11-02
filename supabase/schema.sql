@@ -89,21 +89,14 @@ create trigger on_auth_user_created
 create unique index if not exists profiles_display_name_unique
   on profiles (lower(display_name));
 
--- Devolve o email associado a um nome de utilizador (para permitir login por
--- nome). security definer para conseguir ler auth.users; grant a anon (login
--- acontece antes de autenticar).
-create or replace function public.email_for_username(uname text)
-returns text language plpgsql security definer set search_path = public as $$
-declare em text;
-begin
-  select u.email into em
-  from profiles p
-  join auth.users u on u.id = p.id
-  where lower(p.display_name) = lower(uname)
-  limit 1;
-  return em;
-end; $$;
-grant execute on function public.email_for_username(text) to anon, authenticated;
+-- SEGURANÇA: o login por nome de utilizador NÃO é resolvido em SQL exposto ao
+-- cliente. A função antiga `email_for_username` era security definer e estava
+-- concedida a `anon` -> qualquer pessoa, sem autenticação, obtinha o email de
+-- uma conta a partir do nome (fuga de PII + enumeração). Foi removida.
+-- O login por nome passa agora por uma Edge Function (`login-username`) que
+-- resolve o email no servidor (service role) e devolve apenas uma sessão quando
+-- a password está correta — o email nunca chega ao cliente. Ver docs/SECURITY.md.
+drop function if exists public.email_for_username(text);
 
 -- ─────────────────────── Row-Level Security ───────────────────────────
 alter table profiles    enable row level security;
@@ -123,3 +116,11 @@ create policy own_plans     on plans        for all using (auth.uid() = user_id)
 -- feed: qualquer autenticado LÊ; só escreve os seus próprios eventos
 create policy feed_read   on feed_events for select to authenticated using (true);
 create policy feed_insert on feed_events for insert to authenticated with check (auth.uid() = user_id);
+
+-- ──────────────────────── Migração (aditiva, re-executável) ────────────────
+-- Necessária para o sync não-destrutivo do peso e para persistir o ledger de
+-- idempotência de treinos. Segura de correr em dados existentes.
+--   1) upsert do weight_log por (user_id, date) exige esta constraint única;
+--   2) rewarded_workouts guarda que treinos (season:dia) já deram recompensa.
+create unique index if not exists weight_log_user_date_unique on weight_log (user_id, date);
+alter table progress add column if not exists rewarded_workouts jsonb default '{}'::jsonb;
