@@ -4,7 +4,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateWorkoutPlan, geminiConfigured } from './geminiService';
-import { buildWorkout } from '../domain/planGenerator';
+import { buildWorkout, buildSchedule, diagnoseWorkout } from '../domain/planGenerator';
+import { validatePlan } from '../domain/planSchema';
 import { scheduleSync } from './cloudSync';
 
 const PLAN_KEY = 'workoutPlan';
@@ -31,28 +32,42 @@ export async function generateSeasonPlan(profile, season = 1, startDate = new Da
   const startD = new Date(startDate);
   startD.setHours(0, 0, 0, 0);
 
+  // Weekly scheduling is decided up front (which days train, which recover),
+  // separate from building each session.
+  const schedule = buildSchedule(profile, 30);
   const plan = [];
-  for (let i = 1; i <= 30; i++) {
+  for (const slot of schedule) {
     const date = new Date(startD);
-    date.setDate(startD.getDate() + i - 1);
+    date.setDate(startD.getDate() + slot.day_number - 1);
     const iso = date.toISOString();
 
-    if (i % 7 === 0) {
-      plan.push({ day_number: i, date: iso, workout_type: 'Recovery', exercises: [], completed: false });
+    if (slot.kind === 'recovery') {
+      plan.push({ day_number: slot.day_number, date: iso, workout_type: 'Recovery', exercises: [], completed: false });
       continue;
     }
     // AI is optional: only try the network when a key is configured, otherwise
     // go straight to the deterministic generator (offline-first).
-    const w = geminiConfigured ? await generateWithRetry(profile, i, season, lang) : null;
+    let w = geminiConfigured ? await generateWithRetry(profile, slot.day_number, season, lang) : null;
     if (w) {
-      plan.push({ ...w, day_number: i, date: iso, completed: false });
+      plan.push({ ...w, day_number: slot.day_number, date: iso, completed: false });
       await sleep(1200); // space out AI calls to dodge the rate limit
-    } else {
-      // deterministic fallback — a valid workout with real exercises, no network
-      const local = buildWorkout(profile, i, season, lang);
-      plan.push({ ...local, day_number: i, date: iso, completed: false });
+      continue;
     }
+    // deterministic fallback — a valid workout with real exercises, no network
+    w = buildWorkout(profile, slot.day_number, season, lang, slot.focus);
+    if (w) {
+      plan.push({ ...w, day_number: slot.day_number, date: iso, completed: false });
+      continue;
+    }
+    // last resort: the catalogue can't satisfy the profile (e.g. everything
+    // excluded). Insert an explicit, explained rest day instead of an empty or
+    // malformed workout — the plan stays valid and the reason is visible.
+    const diag = diagnoseWorkout(profile);
+    plan.push({ day_number: slot.day_number, date: iso, workout_type: 'Rest', exercises: [], completed: false, reason: diag.reason });
   }
+
+  const problems = validatePlan(plan);
+  if (problems.length) console.warn('[planService] generated plan has issues:', problems.slice(0, 5));
 
   await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(plan));
   await AsyncStorage.setItem(PLAN_START_KEY, startD.toISOString());

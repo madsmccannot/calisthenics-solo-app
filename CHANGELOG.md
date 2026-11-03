@@ -45,8 +45,29 @@
   duration, sets, per-exercise history) plug in without rewriting the engine (a
   forward-compat test proves the objective path already decides identically).
   12 tests (`__tests__/progression.test.js`). Not yet wired to the UI/generator.
+- Phase 3 — Deterministic Training Programming Engine completed to spec. The
+  generator (`src/domain/planGenerator.js`) is now layered by responsibility:
+  `normalizeProfile` (validate explicit inputs into constraints, with safe
+  defaults for daysPerWeek / sessionMinutes / goal), `buildSchedule` (weekly
+  scheduling — which days train vs. recover, now driven by `daysPerWeek`),
+  `selectExercises` (exercise selection under hard constraints only),
+  `prescribe` (prescription numbers, with season scaling isolated here for a
+  clean Phase 4 swap), and `buildWorkout` (orchestration). Each session now
+  carries `schema_version` and per-exercise + per-workout `reason` metadata
+  (explainability), and an impossible profile (e.g. everything excluded)
+  produces an explicit, diagnosable failure (`diagnoseWorkout`) instead of a
+  malformed day. New plan/workout schema + validators (`src/domain/planSchema.js`,
+  `validateWorkout` / `validatePlan`); the engine's output is validated before
+  it is returned, and `planService` validates the whole plan before saving.
+  Tests: `__tests__/planGenerator.test.js` grew to 58 (layer separation,
+  scheduling frequency, schema-validity, explainability, explicit failure) and
+  new `__tests__/planSchema.test.js` (10). Determinism preserved — existing
+  generated workouts are byte-identical (PRNG draw order unchanged).
 
 ### Changed
+- `planService.js` now builds the weekly schedule up front (`buildSchedule`) and,
+  when neither AI nor the deterministic generator can produce a session, inserts
+  an explicit explained `Rest` day rather than an empty/malformed one.
 - `planService.js` uses the deterministic generator as a fallback and skips the
   network entirely when `EXPO_PUBLIC_GEMINI_API_KEY` is absent (no more 24
   failed calls on first onboarding).
