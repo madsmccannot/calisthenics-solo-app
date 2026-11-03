@@ -40,6 +40,14 @@ const LOAD = {
 // Defaults for optional inputs the onboarding may not collect yet.
 const DEFAULTS = { daysPerWeek: 6, countMin: 5, countMax: 7 };
 
+// Option lists the personalization UI offers (the engine validates anything,
+// but these keep the pickers and the engine in agreement). `sessionMinutes:
+// null` means "no preference" -> the varied 5-7 default.
+export const PROFILE_OPTIONS = {
+  daysPerWeek: [3, 4, 5, 6],
+  sessionMinutes: [null, 15, 20, 30, 45],
+};
+
 // Rest floor (seconds). Prescription magnitude (reps/holds) is bounded by the
 // progression engine's prescriptionFor, not here.
 const MIN_REST = 8;

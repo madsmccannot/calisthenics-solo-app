@@ -80,8 +80,18 @@
 - Phase 7 (quality) — integration test of the full offline loop
   (`__tests__/planService.integration.test.js`): generate → record difficulty →
   earned progression reflected on future days, completed/recovery days
-  untouched. Suite now 131 tests / 9 suites. Docs refreshed (README SDK 58;
-  PROJECT_OVERVIEW §4.1 verified-state note).
+  untouched. Docs refreshed (README SDK 58; PROJECT_OVERVIEW §4.1 note).
+- Personalization inputs — onboarding and the profile screen now collect the
+  inputs the deterministic engine already consumed: **days per week** (reshapes
+  the schedule), **session length** (sets the exercise count; "Auto" keeps the
+  varied 5-7), and **excluded exercises** (toggle chips; never selected). All
+  validated with safe defaults; i18n for all five languages; `PROFILE_OPTIONS`
+  exported so pickers and engine agree. Integration tests prove each input flows
+  from the saved profile into the generated plan. Deliberately NOT collected yet
+  (DEVELOPMENT_RULES §6 — an input needs a real purpose): equipment (catalogue is
+  all bodyweight) and goal (no agreed goal→programming mapping). Session length
+  and exclusions apply to future days on regenerate; days-per-week applies at the
+  next season. Suite now 134 tests / 9 suites.
 - Phase 3 — Deterministic Training Programming Engine completed to spec. The
   generator (`src/domain/planGenerator.js`) is now layered by responsibility:
   `normalizeProfile` (validate explicit inputs into constraints, with safe

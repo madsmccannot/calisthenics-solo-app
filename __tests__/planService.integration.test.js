@@ -81,3 +81,27 @@ test('the retroactive refresh never touches completed or recovery days', async (
   expect(after.find((d) => d.day_number === 1)).toEqual(day1Before); // completed: untouched
   expect(after.find((d) => d.workout_type === 'Recovery')).toEqual(recoveryBefore); // recovery: untouched
 });
+
+describe('personalization inputs flow from the profile into the plan (Phase 3 / #1)', () => {
+  test('daysPerWeek reshapes the weekly schedule', async () => {
+    const plan = await generateSeasonPlan({ level: 'Iniciante', daysPerWeek: 4 }, 1, new Date('2026-01-01'), 'en');
+    // 4 train / 3 recover per 7-day week -> recovery on days 5,6,7, 12,13,14, ...
+    const workouts = plan.filter((d) => d.workout_type !== 'Recovery').length;
+    expect(workouts).toBe(plan.filter((d, i) => ((d.day_number - 1) % 7) < 4).length);
+    expect(plan.find((d) => d.day_number === 5).workout_type).toBe('Recovery');
+  });
+
+  test('sessionMinutes sets the session length', async () => {
+    const plan = await generateSeasonPlan({ level: 'Avançado', sessionMinutes: 45 }, 1, new Date('2026-01-01'), 'en');
+    const day1 = plan.find((d) => d.day_number === 1);
+    expect(day1.exercises.length).toBe(9); // round(45/4)=11 -> clamped to 9
+  });
+
+  test('excluded exercises never appear anywhere in the plan', async () => {
+    const exclude = ['burpee', 'pushup_diamond', 'squat_jump'];
+    const plan = await generateSeasonPlan({ level: 'Avançado', exclude }, 1, new Date('2026-01-01'), 'en');
+    for (const day of plan) {
+      for (const ex of day.exercises || []) expect(exclude).not.toContain(ex.id);
+    }
+  });
+});

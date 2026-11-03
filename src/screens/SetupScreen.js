@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { scheduleSync } from '../services/cloudSync';
+import { PROFILE_OPTIONS } from '../domain/planGenerator';
 import { useI18n } from '../i18n/I18nContext';
 
 // Canonical level values (kept fixed — used as keys and sent to the AI).
@@ -15,6 +16,8 @@ export default function SetupScreen({ onSetupComplete }) {
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
   const [level, setLevel] = useState('Iniciante');
+  const [daysPerWeek, setDaysPerWeek] = useState(6);
+  const [sessionMinutes, setSessionMinutes] = useState(null); // null = Auto (varied 5-7)
 
   const handleStart = async () => {
     if (!weight || !height) {
@@ -22,7 +25,7 @@ export default function SetupScreen({ onSetupComplete }) {
       return;
     }
 
-    const profile = { weight, height, level };
+    const profile = { weight, height, level, daysPerWeek, sessionMinutes };
     await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
     await AsyncStorage.setItem('planStartDate', new Date().toISOString());
     scheduleSync();
@@ -61,6 +64,34 @@ export default function SetupScreen({ onSetupComplete }) {
           >
             <Text style={[styles.levelText, level === l && styles.levelTextActive]}>
               {t('level.' + l)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={styles.label}>{t('setup.days')}</Text>
+      <View style={styles.levelContainer}>
+        {PROFILE_OPTIONS.daysPerWeek.map((d) => (
+          <TouchableOpacity
+            key={d}
+            style={[styles.levelBtn, daysPerWeek === d && styles.levelBtnActive]}
+            onPress={() => setDaysPerWeek(d)}
+          >
+            <Text style={[styles.levelText, daysPerWeek === d && styles.levelTextActive]}>{d}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={styles.label}>{t('setup.duration')}</Text>
+      <View style={styles.levelContainer}>
+        {PROFILE_OPTIONS.sessionMinutes.map((m) => (
+          <TouchableOpacity
+            key={String(m)}
+            style={[styles.levelBtn, sessionMinutes === m && styles.levelBtnActive]}
+            onPress={() => setSessionMinutes(m)}
+          >
+            <Text style={[styles.levelText, sessionMinutes === m && styles.levelTextActive]}>
+              {m == null ? t('setup.auto') : `${m}m`}
             </Text>
           </TouchableOpacity>
         ))}

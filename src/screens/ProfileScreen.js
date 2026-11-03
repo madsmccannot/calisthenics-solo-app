@@ -12,6 +12,8 @@ import LanguagePicker from '../components/LanguagePicker';
 import { colors, radius } from '../theme';
 import { useI18n } from '../i18n/I18nContext';
 import { getRegenerableCount, regenerateFuturePlan, getPlanClass } from '../services/planService';
+import { PROFILE_OPTIONS } from '../domain/planGenerator';
+import { EXERCISES, exerciseName } from '../domain/exercises';
 import { getProgressSummary, getAvatar } from '../services/progressStore';
 import { getStreakData } from '../services/localStore';
 import { scheduleSync, getDisplayName } from '../services/cloudSync';
@@ -42,6 +44,9 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
   const [weight, setWeight] = useState(profile?.weight || '');
   const [height, setHeight] = useState(profile?.height || '');
   const [level, setLevel] = useState(profile?.level || 'Iniciante');
+  const [daysPerWeek, setDaysPerWeek] = useState(profile?.daysPerWeek || 6);
+  const [sessionMinutes, setSessionMinutes] = useState(profile?.sessionMinutes ?? null);
+  const [exclude, setExclude] = useState(Array.isArray(profile?.exclude) ? profile.exclude : []);
   const [saved, setSaved] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
@@ -69,16 +74,28 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
     setDisplayName(await getDisplayName());
   };
 
-  const loadDiffers = level !== planClass && regenCount > 0;
+  const sameSet = (a = [], b = []) => a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
+  const settingsDiffer =
+    (sessionMinutes ?? null) !== (profile?.sessionMinutes ?? null) ||
+    !sameSet(exclude, Array.isArray(profile?.exclude) ? profile.exclude : []);
+  // Session length and exclusions take effect by regenerating future days;
+  // daysPerWeek only reshapes the schedule at the next season, so it does not
+  // drive this prompt.
+  const needsRegen = regenCount > 0 && (level !== planClass || settingsDiffer);
   const bmi = bmiInfo(profile?.weight, profile?.height);
   const stats = summary?.stats || {};
+
+  const buildProfile = () => ({ ...(profile || {}), weight, height, level, daysPerWeek, sessionMinutes, exclude });
+
+  const toggleExclude = (id) =>
+    setExclude((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const handleSave = async () => {
     if (!weight || !height) {
       setInfo({ emoji: '⚠️', title: t('profile.missingTitle'), message: t('profile.missingMsg') });
       return;
     }
-    const updated = { weight, height, level };
+    const updated = buildProfile();
     await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
     onProfileUpdate(updated);
     scheduleSync();
@@ -89,7 +106,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
   const handleRegenConfirm = async () => {
     setShowRegenConfirm(false);
     setRegenerating(true);
-    const updated = { weight, height, level };
+    const updated = buildProfile();
     await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
     onProfileUpdate(updated);
     const { changed } = await regenerateFuturePlan(updated, lang);
@@ -193,18 +210,68 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
             ))}
           </View>
 
+          <Text style={styles.label}>{t('setup.days')}</Text>
+          <View style={styles.levelContainer}>
+            {PROFILE_OPTIONS.daysPerWeek.map((d) => (
+              <TouchableOpacity
+                key={d}
+                style={[styles.levelBtn, daysPerWeek === d && styles.levelBtnActive]}
+                onPress={() => setDaysPerWeek(d)}
+              >
+                <Text style={[styles.levelText, daysPerWeek === d && styles.levelTextActive]}>{d}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.label}>{t('setup.duration')}</Text>
+          <View style={styles.levelContainer}>
+            {PROFILE_OPTIONS.sessionMinutes.map((m) => (
+              <TouchableOpacity
+                key={String(m)}
+                style={[styles.levelBtn, sessionMinutes === m && styles.levelBtnActive]}
+                onPress={() => setSessionMinutes(m)}
+              >
+                <Text style={[styles.levelText, sessionMinutes === m && styles.levelTextActive]}>
+                  {m == null ? t('setup.auto') : `${m}m`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.label}>{t('profile.exclusions')}</Text>
+          <View style={styles.chipRow}>
+            {EXERCISES.map((e) => {
+              const on = exclude.includes(e.id);
+              return (
+                <TouchableOpacity
+                  key={e.id}
+                  style={[styles.chip, on && styles.chipActive]}
+                  onPress={() => toggleExclude(e.id)}
+                >
+                  <Text style={[styles.chipText, on && styles.chipTextActive]}>
+                    {on ? '✕ ' : ''}{exerciseName(e.id, lang)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
             <Text style={styles.saveBtnText}>{saved ? t('profile.saved') : t('profile.save')}</Text>
           </TouchableOpacity>
 
-          {loadDiffers && (
+          {needsRegen && (
             <TouchableOpacity style={styles.applyLoadBtn} onPress={() => setShowRegenConfirm(true)}>
               <Text style={styles.applyLoadText}>
-                {t('profile.applyLoad', { level: t('level.' + level), n: regenCount })}
+                {level !== planClass
+                  ? t('profile.applyLoad', { level: t('level.' + level), n: regenCount })
+                  : t('profile.applyChanges', { n: regenCount })}
               </Text>
-              <Text style={styles.applyLoadSub}>
-                {planClass ? t('profile.applyLoadSub', { level: t('level.' + planClass) }) : t('profile.applyLoadSubOld')}
-              </Text>
+              {level !== planClass && (
+                <Text style={styles.applyLoadSub}>
+                  {planClass ? t('profile.applyLoadSub', { level: t('level.' + planClass) }) : t('profile.applyLoadSubOld')}
+                </Text>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -331,6 +398,14 @@ const styles = StyleSheet.create({
   levelBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   levelText: { color: colors.textMuted, fontWeight: '600', fontSize: 13, textAlign: 'center' },
   levelTextActive: { color: colors.onPrimary },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  chip: {
+    paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.md,
+    backgroundColor: colors.cardInner, borderWidth: 1, borderColor: colors.borderLight,
+  },
+  chipActive: { backgroundColor: colors.red, borderColor: colors.red },
+  chipText: { color: colors.textMuted, fontSize: 13 },
+  chipTextActive: { color: colors.text, fontWeight: '600' },
   saveBtn: { marginTop: 24, backgroundColor: colors.primary, padding: 16, borderRadius: radius.lg, alignItems: 'center' },
   saveBtnText: { fontSize: 16, fontWeight: 'bold', color: colors.onPrimary },
   applyLoadBtn: {
