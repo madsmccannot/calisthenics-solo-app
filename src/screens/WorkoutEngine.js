@@ -19,6 +19,7 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
   const progressAnim = useRef(new Animated.Value(1)).current;
   const currentIndexRef = useRef(0);
   const completedRef = useRef(false); // guards against a double onComplete()
+  const ratingsRef = useRef({}); // { exerciseId: 'easy'|'ok'|'hard' } — Phase 4
 
   const exercises = workout?.exercises || [];
   const current = exercises[currentIndex];
@@ -60,10 +61,22 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
       completedRef.current = true;
       playBeep();
       setTimeout(() => playBeep(), 400);
-      onComplete();
+      onComplete(ratingsRef.current);
     } else {
       setCurrentIndex(idx + 1);
       setPhase('exercise');
+    }
+  };
+
+  // Records how the just-finished exercise felt (Phase 4 difficulty signal),
+  // then moves on: into rest if any, otherwise straight to the next exercise.
+  const handleRate = (difficulty) => {
+    const cur = exercises[currentIndexRef.current];
+    if (cur) ratingsRef.current[cur.id] = difficulty;
+    if (cur && cur.rest_seconds > 0) {
+      setPhase('rest');
+    } else {
+      goToNext();
     }
   };
 
@@ -88,12 +101,7 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
           if (isRestPhase) {
             goToNext();
           } else {
-            const cur = exercises[currentIndexRef.current];
-            if (cur.rest_seconds > 0) {
-              setPhase('rest');
-            } else {
-              goToNext();
-            }
+            setPhase('rating');
           }
           return 0;
         }
@@ -110,20 +118,12 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
         clearInterval(intervalRef.current);
         setIsRunning(false);
         playBeep();
-        if (current.rest_seconds > 0) {
-          setPhase('rest');
-        } else {
-          goToNext();
-        }
+        setPhase('rating');
       }
       return;
     }
     playBeep();
-    if (current.rest_seconds > 0) {
-      setPhase('rest');
-    } else {
-      goToNext();
-    }
+    setPhase('rating');
   };
 
   const skipRest = () => {
@@ -216,6 +216,20 @@ export default function WorkoutEngine({ workout, onComplete, onBack, className =
               <Text style={styles.doneBtnText}>{getButtonLabel()}</Text>
             </TouchableOpacity>
           </>
+        ) : phase === 'rating' ? (
+          <View style={styles.ratingContainer}>
+            <Text style={styles.ratingTitle}>{t('workout.rateQuestion')}</Text>
+            <Text style={styles.ratingExercise}>{current.display_name}</Text>
+            <TouchableOpacity style={[styles.rateBtn, styles.rateEasy]} onPress={() => handleRate('easy')}>
+              <Text style={styles.rateBtnText}>{t('workout.easy')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.rateBtn, styles.rateOk]} onPress={() => handleRate('ok')}>
+              <Text style={styles.rateBtnText}>{t('workout.ok')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.rateBtn, styles.rateHard]} onPress={() => handleRate('hard')}>
+              <Text style={styles.rateBtnText}>{t('workout.hard')}</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <View style={styles.restContainer}>
             <Text style={styles.restTitle}>{t('workout.rest')}</Text>
@@ -291,6 +305,17 @@ const styles = StyleSheet.create({
     borderRadius: 16, alignItems: 'center'
   },
   doneBtnText: { fontSize: 18, fontWeight: 'bold', color: '#000000' },
+  ratingContainer: { flex: 1, alignItems: 'center', paddingTop: 50 },
+  ratingTitle: { color: '#ffffff', fontSize: 22, fontWeight: 'bold', marginBottom: 6 },
+  ratingExercise: { color: '#aaaaaa', fontSize: 16, marginBottom: 32, textAlign: 'center' },
+  rateBtn: {
+    width: '100%', padding: 18, borderRadius: 16, alignItems: 'center',
+    marginTop: 14, borderWidth: 1,
+  },
+  rateEasy: { backgroundColor: '#132d1e', borderColor: '#4ade80' },
+  rateOk: { backgroundColor: '#2a2a1a', borderColor: '#fbbf24' },
+  rateHard: { backgroundColor: '#2d1616', borderColor: '#f87171' },
+  rateBtnText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
   restContainer: { flex: 1, alignItems: 'center', paddingTop: 60 },
   restTitle: { color: '#aaaaaa', fontSize: 20, marginBottom: 16 },
   restTimer: { color: '#4ade80', fontSize: 96, fontWeight: 'bold' },

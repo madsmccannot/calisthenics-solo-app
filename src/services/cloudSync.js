@@ -105,6 +105,7 @@ export function gameToRow(game = {}) {
     stats: game.stats || {},
     missions: game.missions || null,
     rewarded_workouts: game.rewardedWorkouts || {},
+    progression: game.progression || {},
   };
 }
 
@@ -120,8 +121,73 @@ export function rowToGame(row = {}, prevFeed = []) {
     stats: row.stats || {},
     missions: row.missions || null,
     rewardedWorkouts: row.rewarded_workouts || {},
+    progression: row.progression || {},
     // Never discard local feed history on a pull.
     feedEvents: Array.isArray(prevFeed) ? prevFeed : [],
+  };
+}
+
+// Explicit conflict reconciliation for the gameState blob on a pull, by field
+// semantics (not blanket last-write-wins, which could erase offline-earned
+// progress):
+//   - monotonic counters (xp, season, cumulative stats) -> max (never go back);
+//   - additive collections (medals, ownedItems, rewardedWorkouts, repsByExercise)
+//     -> union (you never un-earn a medal or un-buy an item);
+//   - balance/cosmetic/daily (coins, avatar, missions) -> the more RECENT side,
+//     using xp as a logical clock (higher xp = more recent activity), so a stale
+//     remote can't resurrect spent coins;
+//   - progression -> per exercise, the entry with the later updatedAt;
+//   - feedEvents -> local (already preserved on pull).
+export function mergeGameState(local = {}, remote = {}) {
+  const n = (o, k) => Number(o && o[k]) || 0;
+  const localNewer = n(local, 'xp') >= n(remote, 'xp');
+  const newer = localNewer ? local : remote;
+  const older = localNewer ? remote : local;
+
+  const ls = local.stats || {};
+  const rs = remote.stats || {};
+  const maxStat = (k) => Math.max(Number(ls[k]) || 0, Number(rs[k]) || 0);
+
+  const repsByExercise = {};
+  for (const src of [rs.repsByExercise || {}, ls.repsByExercise || {}]) {
+    for (const [id, v] of Object.entries(src)) {
+      repsByExercise[id] = Math.max(repsByExercise[id] || 0, Number(v) || 0);
+    }
+  }
+
+  const progression = {};
+  const ids = new Set([
+    ...Object.keys(local.progression || {}),
+    ...Object.keys(remote.progression || {}),
+  ]);
+  for (const id of ids) {
+    const a = (local.progression || {})[id];
+    const b = (remote.progression || {})[id];
+    if (!a) progression[id] = b;
+    else if (!b) progression[id] = a;
+    else progression[id] = new Date(a.updatedAt || 0) >= new Date(b.updatedAt || 0) ? a : b;
+  }
+
+  return {
+    version: 1,
+    xp: Math.max(n(local, 'xp'), n(remote, 'xp')),
+    season: Math.max(n(local, 'season'), n(remote, 'season')),
+    coins: n(newer, 'coins'),
+    avatar: newer.avatar || older.avatar || {},
+    missions: newer.missions || older.missions || null,
+    ownedItems: Array.from(new Set([...(local.ownedItems || []), ...(remote.ownedItems || [])])),
+    medals: { ...(remote.medals || {}), ...(local.medals || {}) },
+    rewardedWorkouts: { ...(remote.rewardedWorkouts || {}), ...(local.rewardedWorkouts || {}) },
+    progression,
+    feedEvents: Array.isArray(local.feedEvents) ? local.feedEvents : (remote.feedEvents || []),
+    stats: {
+      totalWorkouts: maxStat('totalWorkouts'),
+      totalExercises: maxStat('totalExercises'),
+      totalReps: maxStat('totalReps'),
+      totalSeconds: maxStat('totalSeconds'),
+      totalXpEarned: maxStat('totalXpEarned'),
+      repsByExercise,
+    },
   };
 }
 
@@ -243,14 +309,15 @@ export async function pullSnapshot() {
     }
 
     if (prog.data) {
-      // Overwrite the local gameState under the same lock as local mutations, so
-      // a pull can't land between a local read and its write (and vice-versa).
-      // Reading the current feed and writing the merged state must be one atomic
-      // step, otherwise a feed milestone logged in between would be lost.
+      // Reconcile remote with local under the same lock as local mutations.
+      // Instead of a blind overwrite (remote-wins) we MERGE by field semantics
+      // (mergeGameState), so a pull can never erase progress the device earned
+      // offline but hasn't pushed yet. Read + merge + write is one atomic step.
       await withGameLock(async () => {
-        let prevFeed = [];
-        try { prevFeed = JSON.parse((await AsyncStorage.getItem(K.game)) || 'null')?.feedEvents || []; } catch {}
-        await AsyncStorage.setItem(K.game, JSON.stringify(rowToGame(prog.data, prevFeed)));
+        let local = {};
+        try { local = JSON.parse((await AsyncStorage.getItem(K.game)) || '{}') || {}; } catch {}
+        const remote = rowToGame(prog.data, local.feedEvents || []);
+        await AsyncStorage.setItem(K.game, JSON.stringify(mergeGameState(local, remote)));
       });
     }
     if (plan.data?.days) {

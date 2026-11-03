@@ -124,3 +124,5 @@ create policy feed_insert on feed_events for insert to authenticated with check 
 --   2) rewarded_workouts guarda que treinos (season:dia) já deram recompensa.
 create unique index if not exists weight_log_user_date_unique on weight_log (user_id, date);
 alter table progress add column if not exists rewarded_workouts jsonb default '{}'::jsonb;
+-- Phase 4: per-exercise earned progression ({ exerciseId: { offset, ... } }).
+alter table progress add column if not exists progression jsonb default '{}'::jsonb;

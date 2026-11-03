@@ -43,6 +43,7 @@ import {
   gameToRow,
   rowToGame,
   pgDateList,
+  mergeGameState,
 } from '../src/services/cloudSync';
 
 const opNames = (rec) => rec.ops.map((o) => o[0]);
@@ -126,5 +127,57 @@ describe('pushSnapshot — non-destructive weight sync', () => {
     expect(hasPendingSync()).toBe(true);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('progress'));
     warn.mockRestore();
+  });
+});
+
+describe('mergeGameState — explicit conflict reconciliation (Phase 5)', () => {
+  test('fresh device adopts remote (local is all defaults)', () => {
+    const local = { xp: 0, coins: 0, stats: {} };
+    const remote = { xp: 500, coins: 120, season: 2, medals: { m1: 't' }, stats: { totalWorkouts: 10 } };
+    const m = mergeGameState(local, remote);
+    expect(m.xp).toBe(500);
+    expect(m.coins).toBe(120);
+    expect(m.season).toBe(2);
+    expect(m.medals.m1).toBe('t');
+    expect(m.stats.totalWorkouts).toBe(10);
+  });
+
+  test('a stale pull never lowers monotonic counters earned offline', () => {
+    const local = { xp: 600, season: 3, stats: { totalWorkouts: 12, totalXpEarned: 600 } };
+    const remote = { xp: 500, season: 2, stats: { totalWorkouts: 10, totalXpEarned: 500 } };
+    const m = mergeGameState(local, remote);
+    expect(m.xp).toBe(600);
+    expect(m.season).toBe(3);
+    expect(m.stats.totalWorkouts).toBe(12);
+  });
+
+  test('a stale pull cannot resurrect spent coins (balance follows the newer side)', () => {
+    // local spent coins after earning more xp -> local is newer -> its balance wins
+    const local = { xp: 600, coins: 20 };
+    const remote = { xp: 500, coins: 300 };
+    expect(mergeGameState(local, remote).coins).toBe(20);
+  });
+
+  test('additive collections union (medals/items/rewarded never un-earn)', () => {
+    const local = { xp: 10, medals: { a: 't' }, ownedItems: ['x'], rewardedWorkouts: { '1:1': 't' } };
+    const remote = { xp: 20, medals: { b: 't' }, ownedItems: ['y'], rewardedWorkouts: { '1:2': 't' } };
+    const m = mergeGameState(local, remote);
+    expect(Object.keys(m.medals).sort()).toEqual(['a', 'b']);
+    expect([...m.ownedItems].sort()).toEqual(['x', 'y']);
+    expect(Object.keys(m.rewardedWorkouts).sort()).toEqual(['1:1', '1:2']);
+  });
+
+  test('progression keeps the later-updated entry per exercise', () => {
+    const local = { xp: 10, progression: { pushup_classic: { offset: 4, updatedAt: '2026-01-02' } } };
+    const remote = { xp: 20, progression: { pushup_classic: { offset: 2, updatedAt: '2026-01-01' }, squat_classic: { offset: 6, updatedAt: '2026-01-03' } } };
+    const m = mergeGameState(local, remote);
+    expect(m.progression.pushup_classic.offset).toBe(4); // local newer updatedAt
+    expect(m.progression.squat_classic.offset).toBe(6); // only remote has it
+  });
+
+  test('local feed history is preserved', () => {
+    const local = { xp: 5, feedEvents: [{ id: 'f1' }] };
+    const remote = { xp: 9, feedEvents: [] };
+    expect(mergeGameState(local, remote).feedEvents).toEqual([{ id: 'f1' }]);
   });
 });

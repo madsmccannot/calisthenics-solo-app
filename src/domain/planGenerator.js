@@ -15,8 +15,9 @@
 // Deterministic: the same (level, season, dayNumber) seeds the same PRNG, so the
 // same inputs always yield the same workout; different days vary.
 
-import { eligibleExercises, exerciseName, getExercise, TYPE_REPS } from './exercises';
+import { eligibleExercises, exerciseName, getExercise, LEVEL_TIER, TYPE_REPS } from './exercises';
 import { SCHEMA_VERSION, validateWorkout } from './planSchema';
+import { prescriptionFor, atCeiling, atFloor } from './progression';
 
 // 6-day focus rotation. The `type` values MUST stay in sync with DAILY_FOCUS in
 // geminiService.js so the AI path and this fallback label each day the same way.
@@ -39,9 +40,8 @@ const LOAD = {
 // Defaults for optional inputs the onboarding may not collect yet.
 const DEFAULTS = { daysPerWeek: 6, countMin: 5, countMax: 7 };
 
-// Bounds so season scaling can never produce an absurd prescription.
-const MAX_REPS = 50;
-const MAX_HOLD = 120;
+// Rest floor (seconds). Prescription magnitude (reps/holds) is bounded by the
+// progression engine's prescriptionFor, not here.
 const MIN_REST = 8;
 
 // --- deterministic PRNG -----------------------------------------------------
@@ -79,14 +79,6 @@ function shuffle(rng, arr) {
     [out[i], out[j]] = [out[j], out[i]];
   }
   return out;
-}
-
-// Season difficulty scaling: +15% per season past the first, bounded.
-// Isolated here so Phase 4 can swap it for per-exercise progression without
-// touching selection, scheduling, or the schema.
-function scale(base, season, cap) {
-  const factor = 1 + Math.max(0, season - 1) * 0.15;
-  return Math.min(cap, Math.round(base * factor));
 }
 
 // --- 1. input normalization -------------------------------------------------
@@ -168,16 +160,47 @@ export function selectExercises(norm, focus, rng) {
 }
 
 // --- 4. prescription --------------------------------------------------------
-// Turns a selected exercise into concrete numbers for the class and season.
-// (Phase 4 will replace the season term with per-exercise earned progression.)
-export function prescribe(exercise, load, season, rng) {
+// Turns a selected exercise into concrete numbers for the class, adjusted by the
+// exercise's EARNED progression (Phase 4) — not by the season counter. A fresh
+// profile (no progression yet) gets the class base; difficulty rises per
+// exercise only as the person earns it. `entry` is this exercise's progression
+// state ({ offset }), or undefined for none.
+export function prescribe(exercise, load, rng, entry) {
   const isReps = exercise.type === TYPE_REPS;
   const base = isReps
     ? pickInt(rng, load.reps[0], load.reps[1])
     : pickInt(rng, load.hold[0], load.hold[1]);
-  const quantity = scale(base, season, isReps ? MAX_REPS : MAX_HOLD);
-  const rest = Math.max(MIN_REST, pickInt(rng, load.rest[0], load.rest[1]) - Math.max(0, season - 1) * 2);
+  const quantity = prescriptionFor(base, exercise.type, entry);
+  const rest = Math.max(MIN_REST, pickInt(rng, load.rest[0], load.rest[1]));
   return { quantity, rest_seconds: rest };
+}
+
+// --- 4b. variant swap -------------------------------------------------------
+// Progression within an exercise vs. progression to a different exercise: once
+// an exercise has earned all its offset allows (atCeiling), move to its harder
+// catalogue variant; once it has been eased to the floor (atFloor), drop to its
+// easier variant. Hard constraints still apply — the variant must be within the
+// class tier, not excluded, and not already in the session. If none qualifies,
+// the original exercise stays (with its offset).
+export function resolveVariant(exercise, entry, { level = 'Iniciante', exclude = [], used } = {}) {
+  const maxTier = LEVEL_TIER[level] || 1;
+  const excl = new Set(exclude);
+  const taken = used || new Set();
+  const candidate = (id) => {
+    if (!id) return null;
+    const v = getExercise(id);
+    if (!v || v.tier > maxTier || excl.has(id) || taken.has(id)) return null;
+    return v;
+  };
+  if (atCeiling(exercise.type, entry)) {
+    const up = candidate(exercise.progression);
+    if (up) return up;
+  }
+  if (atFloor(exercise.type, entry)) {
+    const down = candidate(exercise.regression);
+    if (down) return down;
+  }
+  return exercise;
 }
 
 // --- 5. orchestration -------------------------------------------------------
@@ -185,8 +208,10 @@ export function prescribe(exercise, load, season, rng) {
 // AI path returns (planService adds day_number/date/completed), or null if the
 // catalogue cannot satisfy even a minimal session (see diagnoseWorkout for why).
 // `focusOverride` lets buildSchedule supply the focus; otherwise it's derived
-// from dayNumber (kept backward-compatible with existing callers).
-export function buildWorkout(profile = {}, dayNumber = 1, season = 1, lang = 'en', focusOverride = null) {
+// from dayNumber. `progression` is the per-exercise earned-progression map
+// ({ [id]: { offset } }), applied to each prescription. The season still seeds
+// the PRNG (so a new block brings fresh variety) but no longer scales difficulty.
+export function buildWorkout(profile = {}, dayNumber = 1, season = 1, lang = 'en', focusOverride = null, progression = {}) {
   const norm = normalizeProfile(profile);
   const focus = focusOverride || focusForDay(dayNumber);
   const rng = mulberry32(seedFrom(norm.level, season, dayNumber));
@@ -200,8 +225,13 @@ export function buildWorkout(profile = {}, dayNumber = 1, season = 1, lang = 'en
   );
 
   const load = LOAD[norm.level];
-  const exercises = selected.map(({ exercise: e, fromPrimary }) => {
-    const { quantity, rest_seconds } = prescribe(e, load, season, rng);
+  // Reserve the selected ids so a variant swap can't duplicate another pick.
+  const used = new Set(selected.map((s) => s.exercise.id));
+  const exercises = selected.map(({ exercise: e0, fromPrimary }) => {
+    const e = resolveVariant(e0, progression[e0.id], { level: norm.level, exclude: norm.exclude, used });
+    const swapped = e.id !== e0.id;
+    if (swapped) used.add(e.id);
+    const { quantity, rest_seconds } = prescribe(e, load, rng, progression[e.id]);
     return {
       id: e.id,
       display_name: exerciseName(e.id, lang),
@@ -209,7 +239,9 @@ export function buildWorkout(profile = {}, dayNumber = 1, season = 1, lang = 'en
       quantity,
       rest_seconds,
       animation_file: e.animation,
-      reason: fromPrimary ? `focus:${e.pattern}` : 'added for session length',
+      reason: swapped
+        ? `variant of ${e0.id} (earned ${e.tier > e0.tier ? 'progression' : 'regression'})`
+        : fromPrimary ? `focus:${e.pattern}` : 'added for session length',
     };
   });
 
@@ -242,4 +274,4 @@ export function diagnoseWorkout(profile = {}) {
 }
 
 // Exposed for tests / debugging.
-export { FOCUS_ROTATION, LOAD, scale, getExercise };
+export { FOCUS_ROTATION, LOAD, getExercise };

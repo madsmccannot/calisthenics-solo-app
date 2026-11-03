@@ -37,6 +37,10 @@ export const REGRESS_STREAK = 2;  // 'hard' in a row -> easier
 export const STEP = { reps: 2, time: 5 };
 // Final-prescription bounds (mirror the generator's own caps).
 export const BOUNDS = { reps: [5, 40], time: [15, 90] };
+// Bounds on the earned offset itself. At the top, the next step is a harder
+// catalogue variant; at the bottom, an easier one — so the offset never drifts
+// unboundedly and "at ceiling / at floor" is meaningful.
+export const OFFSET = { reps: [-10, 20], time: [-20, 40] };
 
 function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
@@ -44,6 +48,11 @@ function clamp(n, lo, hi) {
 
 function stepFor(type) {
   return type === 'time' ? STEP.time : STEP.reps;
+}
+
+function clampOffset(offset, type) {
+  const [lo, hi] = type === 'time' ? OFFSET.time : OFFSET.reps;
+  return clamp(offset, lo, hi);
 }
 
 // Turn any outcome into a single difficulty token (or null = no signal).
@@ -83,8 +92,8 @@ export function applyOutcome(progression = {}, exerciseId, type, outcome = {}) {
 
   let offset = prev.offset;
   let nextSignals = signals;
-  if (decision === 'progress') { offset = prev.offset + stepFor(type); nextSignals = []; }
-  else if (decision === 'regress') { offset = prev.offset - stepFor(type); nextSignals = []; }
+  if (decision === 'progress') { offset = clampOffset(prev.offset + stepFor(type), type); nextSignals = []; }
+  else if (decision === 'regress') { offset = clampOffset(prev.offset - stepFor(type), type); nextSignals = []; }
 
   const next = {
     offset,
@@ -103,11 +112,17 @@ export function prescriptionFor(base, type, entry) {
   return clamp(base + (entry?.offset || 0), lo, hi);
 }
 
-// True when an exercise has earned as much as its offset allows and the person
+// True when an exercise has earned as much as its offset allows: the person
 // should move to the harder catalogue variant (if one exists). Lets callers
-// suggest a variant swap without this module importing the catalogue.
+// decide a variant swap without this module importing the catalogue.
 export function atCeiling(type, entry) {
-  const [, hi] = type === 'time' ? BOUNDS.time : BOUNDS.reps;
-  // "near the top": within one step of the bound.
-  return (entry?.offset || 0) >= (hi - (type === 'time' ? 15 : 10));
+  const [, hi] = type === 'time' ? OFFSET.time : OFFSET.reps;
+  return (entry?.offset || 0) >= hi;
+}
+
+// True when an exercise has been eased as far as its offset allows: the person
+// should drop to the easier catalogue variant (if one exists).
+export function atFloor(type, entry) {
+  const [lo] = type === 'time' ? OFFSET.time : OFFSET.reps;
+  return (entry?.offset || 0) <= lo;
 }

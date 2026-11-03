@@ -72,3 +72,10 @@ test('exercisesByMuscle finds work for every declared muscle token', () => {
     if (primary) expect(exercisesByMuscle(m).length).toBeGreaterThan(0);
   }
 });
+
+test('beginner variety: each beginner pattern has at least two options', () => {
+  const t1 = (pattern) => eligibleExercises({ level: 'Iniciante', patterns: [pattern] }).length;
+  expect(t1('push')).toBeGreaterThanOrEqual(2);
+  expect(t1('cardio')).toBeGreaterThanOrEqual(2);
+  expect(t1('core')).toBeGreaterThanOrEqual(2);
+});

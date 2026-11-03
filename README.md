@@ -30,7 +30,7 @@ It started as a simple workout tracker and turned into a progression **game**: o
 - 🏆 **Tiers** — Season 1-3, then Elite (4), Master (7), Legend (10+)
 
 ## Tech stack
-- **Expo / React Native** (SDK 54, RN 0.81, React 19)
+- **Expo / React Native** (SDK 58, RN 0.88, React 19)
 - **Gemini** (`gemini-2.5-flash`) for plan generation — thinking disabled, JSON output, per-day/per-season prompting
 - **AsyncStorage** for all local state (no backend — solo/offline)
 - **react-native-svg** for the avatar

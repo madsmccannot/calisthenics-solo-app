@@ -7,6 +7,7 @@ import { generateWorkoutPlan, geminiConfigured } from './geminiService';
 import { buildWorkout, buildSchedule, diagnoseWorkout } from '../domain/planGenerator';
 import { validatePlan } from '../domain/planSchema';
 import { scheduleSync } from './cloudSync';
+import { getProgression } from './progressStore';
 
 const PLAN_KEY = 'workoutPlan';
 const PLAN_CLASS_KEY = 'planClass'; // class the plan's workouts were generated with
@@ -35,6 +36,8 @@ export async function generateSeasonPlan(profile, season = 1, startDate = new Da
   // Weekly scheduling is decided up front (which days train, which recover),
   // separate from building each session.
   const schedule = buildSchedule(profile, 30);
+  // Earned per-exercise progression feeds each prescription (Phase 4).
+  const progression = await getProgression();
   const plan = [];
   for (const slot of schedule) {
     const date = new Date(startD);
@@ -54,7 +57,7 @@ export async function generateSeasonPlan(profile, season = 1, startDate = new Da
       continue;
     }
     // deterministic fallback — a valid workout with real exercises, no network
-    w = buildWorkout(profile, slot.day_number, season, lang, slot.focus);
+    w = buildWorkout(profile, slot.day_number, season, lang, slot.focus, progression);
     if (w) {
       plan.push({ ...w, day_number: slot.day_number, date: iso, completed: false });
       continue;
@@ -129,6 +132,7 @@ export async function regenerateFuturePlan(profile, lang = 'en') {
 
   const plan = JSON.parse(saved);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const progression = await getProgression();
 
   const updated = [];
   let changed = 0;
@@ -145,7 +149,7 @@ export async function regenerateFuturePlan(profile, lang = 'en') {
       }
       if (!workout) {
         // deterministic fallback so a class change still takes effect offline
-        workout = buildWorkout(profile, day.day_number, 1, lang);
+        workout = buildWorkout(profile, day.day_number, 1, lang, null, progression);
       }
       if (workout) {
         // pin the original day_number/date — the AI returns its own day_number
@@ -162,5 +166,34 @@ export async function regenerateFuturePlan(profile, lang = 'en') {
   await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(updated));
   await AsyncStorage.setItem(PLAN_CLASS_KEY, profile.level);
   scheduleSync();
+  return { changed };
+}
+
+// Re-applies earned per-exercise progression (Phase 4) to the FUTURE days of the
+// current plan, so a prescription that was just earned shows up on the next
+// session instead of only at the next season. Deterministic and offline: it
+// rebuilds locally and never calls the AI. Completed days, rest/recovery days
+// and AI-authored days (source !== 'local') are left untouched.
+export async function applyProgressionToFuturePlan(profile, season = 1, lang = 'en') {
+  const saved = await AsyncStorage.getItem(PLAN_KEY);
+  if (!saved) return { changed: 0 };
+  let plan;
+  try { plan = JSON.parse(saved); } catch { return { changed: 0 }; }
+
+  const progression = await getProgression();
+  let changed = 0;
+  const updated = plan.map((day) => {
+    if (day.completed || day.source !== 'local') return day;
+    if (day.workout_type === 'Recovery' || day.workout_type === 'Rest') return day;
+    const w = buildWorkout(profile, day.day_number, season, lang, null, progression);
+    if (!w) return day;
+    changed += 1;
+    return { ...w, day_number: day.day_number, date: day.date, completed: false };
+  });
+
+  if (changed) {
+    await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(updated));
+    scheduleSync();
+  }
   return { changed };
 }

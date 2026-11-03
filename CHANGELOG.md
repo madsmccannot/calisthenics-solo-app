@@ -44,7 +44,44 @@
   single extension point, so Stage 2 objective metrics (actual reps, hold
   duration, sets, per-exercise history) plug in without rewriting the engine (a
   forward-compat test proves the objective path already decides identically).
-  12 tests (`__tests__/progression.test.js`). Not yet wired to the UI/generator.
+  12 tests (`__tests__/progression.test.js`).
+- Phase 4 (steps 2/3) — progression wired end to end. The workout player
+  (`WorkoutEngine`) now asks "how did it feel?" (Easy/OK/Hard) after each
+  exercise; `App.js` folds the per-exercise outcomes into state via
+  `recordOutcomes` (under the game lock), and it syncs (`progression` column +
+  `gameToRow`/`rowToGame`, schema migration). The deterministic generator's
+  `prescribe` now applies each exercise's EARNED offset (`prescriptionFor`)
+  instead of scaling difficulty by the season counter — the blanket per-season
+  increase is gone; a new block brings fresh variety at the class base and
+  difficulty rises per exercise only as it is earned. i18n keys for the rating
+  tap in all five languages. Tests: progression capture
+  (`progressStore.test.js` +3) and consumption (`planGenerator.test.js`).
+  Limitation: UI not yet device-tested.
+- Phase 4 (retroactive) — after a workout, earned progression is now reflected
+  on upcoming days immediately via `applyProgressionToFuturePlan` (local,
+  offline, deterministic; never re-calls the AI and leaves AI-authored days
+  untouched). Closes the earlier "only at next generation" limitation.
+- Phase 4 (variant swap) — progression to a different exercise, not just more
+  reps: `resolveVariant` moves an exercise to its harder catalogue variant once
+  it tops out (`atCeiling`) and to its easier variant once eased to the floor
+  (`atFloor`), always within the class tier, never excluded, never duplicating a
+  pick. The earned offset is now clamped (`OFFSET` bounds) so "ceiling/floor" is
+  well-defined. Tests in `progression.test.js` and `planGenerator.test.js`.
+- Phase 2 (catalogue) — two reviewed beginner-variety exercises added
+  (`knee_pushup`, `high_knees`) reusing existing animations, so each beginner
+  movement pattern now has ≥2 options; xp rates added; the catalogue/prompt test
+  now treats the AI allow-list as a subset (local-only exercises allowed).
+  Pulling coverage remains out of scope (floor/bodyweight, no bar, no asset).
+- Phase 5 (conflict handling) — cloud pull now reconciles the gameState by field
+  semantics (`mergeGameState`) instead of blanket last-write-wins: monotonic
+  counters take the max, additive collections union, balance/cosmetic/daily
+  fields follow the more-recent side (xp as a logical clock), and progression
+  keeps the later-updated entry per exercise. 6 tests in `cloudSync.test.js`.
+- Phase 7 (quality) — integration test of the full offline loop
+  (`__tests__/planService.integration.test.js`): generate → record difficulty →
+  earned progression reflected on future days, completed/recovery days
+  untouched. Suite now 131 tests / 9 suites. Docs refreshed (README SDK 58;
+  PROJECT_OVERVIEW §4.1 verified-state note).
 - Phase 3 — Deterministic Training Programming Engine completed to spec. The
   generator (`src/domain/planGenerator.js`) is now layered by responsibility:
   `normalizeProfile` (validate explicit inputs into constraints, with safe

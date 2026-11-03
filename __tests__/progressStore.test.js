@@ -24,6 +24,8 @@ import {
   completeWorkout,
   getGameState,
   advanceSeason,
+  recordOutcomes,
+  getProgression,
 } from '../src/services/progressStore';
 
 const WORKOUT = {
@@ -99,4 +101,25 @@ test('missing dayNumber keeps awarding (back-compatible, no key)', async () => {
   await completeWorkout({ ...WORKOUT });
   const s = await getGameState();
   expect(s.stats.totalWorkouts).toBe(2); // no idempotency key -> both count
+});
+
+describe('progression capture (Phase 4, step 2)', () => {
+  test('recordOutcomes folds per-exercise difficulty into persisted progression', async () => {
+    // two "easy" exposures of the same exercise earn one step up
+    await recordOutcomes([{ exerciseId: 'pushup_classic', type: 'reps', difficulty: 'easy' }]);
+    await recordOutcomes([{ exerciseId: 'pushup_classic', type: 'reps', difficulty: 'easy' }]);
+    const prog = await getProgression();
+    expect(prog.pushup_classic.offset).toBeGreaterThan(0);
+  });
+
+  test('progression survives a round-trip through storage', async () => {
+    await recordOutcomes([{ exerciseId: 'squat_classic', type: 'reps', difficulty: 'hard' }]);
+    const state = await getGameState();
+    expect(state.progression.squat_classic).toBeDefined();
+  });
+
+  test('an empty outcome list is a no-op', async () => {
+    const prog = await recordOutcomes([]);
+    expect(prog).toBeNull();
+  });
 });

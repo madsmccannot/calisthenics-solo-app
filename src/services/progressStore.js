@@ -10,6 +10,7 @@ import { getItem, DEFAULT_OWNED, SLOTS, defaultItemForSlot } from '../config/sho
 import { publishEvent } from './feedRemote';
 import { scheduleSync } from './cloudSync';
 import { withGameLock } from './gameStateLock';
+import { applyOutcome } from '../domain/progression';
 
 const GAME_KEY = 'gameState';
 
@@ -30,6 +31,7 @@ const DEFAULT_STATE = {
   ownedItems: [], // shop purchases
   missions: null, // { date, items:[...], claimed }
   rewardedWorkouts: {}, // { "season:dayNumber": unlockedAtISO } — idempotency ledger
+  progression: {}, // { exerciseId: { offset, signals, lastRule, updatedAt } } — Phase 4
   feedEvents: [], // the user's own Feed milestones (most recent first)
   stats: {
     totalWorkouts: 0,
@@ -225,6 +227,29 @@ export async function completeWorkout({
     coins: state.coins,
   };
   });
+}
+
+// ---------- Progression (Phase 4) ----------
+// Folds the per-exercise outcomes of a finished workout into the progression
+// state. Each outcome: { exerciseId, type, difficulty?, completed?, ... }.
+// Runs under the game lock (serialized with every other gameState write).
+export async function recordOutcomes(outcomes = []) {
+  if (!Array.isArray(outcomes) || outcomes.length === 0) return null;
+  return withGameLock(async () => {
+    const state = await getGameState();
+    let prog = state.progression || {};
+    for (const o of outcomes) {
+      if (!o || !o.exerciseId) continue;
+      prog = applyOutcome(prog, o.exerciseId, o.type, o);
+    }
+    state.progression = prog;
+    await save(state);
+    return prog;
+  });
+}
+
+export async function getProgression() {
+  return (await getGameState()).progression || {};
 }
 
 // ---------- Missions ----------

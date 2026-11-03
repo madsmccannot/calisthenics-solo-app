@@ -98,3 +98,27 @@ test('objective-metric hook works without any code change to the engine (Stage 2
   const entry = fold('reps', [{ achieved: 15, prescribed: 10 }, { achieved: 16, prescribed: 10 }]);
   expect(entry.offset).toBe(STEP.reps); // same decision path as the subjective tap
 });
+
+describe('offset bounds and ceiling/floor (Phase 4b)', () => {
+  const { OFFSET, atCeiling, atFloor } = require('../src/domain/progression');
+
+  test('offset is clamped — it never drifts past OFFSET bounds', () => {
+    let state = {};
+    // many "easy" exposures: progresses, but offset saturates at the ceiling
+    for (let i = 0; i < 40; i++) state = applyOutcome(state, 'x', 'reps', { difficulty: 'easy' });
+    expect(state.x.offset).toBeLessThanOrEqual(OFFSET.reps[1]);
+    expect(atCeiling('reps', state.x)).toBe(true);
+  });
+
+  test('many "hard" exposures saturate at the floor', () => {
+    let state = {};
+    for (let i = 0; i < 40; i++) state = applyOutcome(state, 'x', 'reps', { difficulty: 'hard' });
+    expect(state.x.offset).toBeGreaterThanOrEqual(OFFSET.reps[0]);
+    expect(atFloor('reps', state.x)).toBe(true);
+  });
+
+  test('a fresh exercise is neither at the ceiling nor the floor', () => {
+    expect(atCeiling('reps', undefined)).toBe(false);
+    expect(atFloor('reps', undefined)).toBe(false);
+  });
+});

@@ -18,7 +18,8 @@ import { supabaseEnabled } from './src/services/supabase';
 import { getSession, onAuthChange, signOut, handleAuthUrl } from './src/services/auth';
 import { setSyncUser, freshAuthSync, flushSync, resetCloud, getDisplayName, retrySync } from './src/services/cloudSync';
 import { updateStreak, getWeightLog } from './src/services/localStore';
-import { completeWorkout, checkMedals, getSeason, advanceSeason, logFeedEvent } from './src/services/progressStore';
+import { completeWorkout, checkMedals, getSeason, advanceSeason, logFeedEvent, recordOutcomes } from './src/services/progressStore';
+import { applyProgressionToFuturePlan } from './src/services/planService';
 import { xpBreakdown, COMPLETION_BONUS } from './src/config/xpTable';
 import { BackHandler } from 'react-native';
 
@@ -88,7 +89,7 @@ export default function App() {
   const [currentStreak, setCurrentStreak] = useState(0);
   const [dashboardKey, setDashboardKey] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const { t, chosen } = useI18n();
+  const { t, chosen, lang } = useI18n();
   // undefined = still checking; null = no session; object = has session
   const [session, setSession] = useState(supabaseEnabled ? undefined : null);
   const [syncing, setSyncing] = useState(false);
@@ -183,7 +184,7 @@ export default function App() {
     setProfile(saved ? JSON.parse(saved) : null); // reset to null if none
   };
 
-  const handleWorkoutComplete = async () => {
+  const handleWorkoutComplete = async (ratings = {}) => {
     let seasonComplete = false;
     const saved = await AsyncStorage.getItem('workoutPlan');
     if (saved) {
@@ -241,6 +242,21 @@ export default function App() {
       seconds,
       repsById,
     });
+
+    // Phase 4: fold this session's per-exercise difficulty into progression.
+    // An unrated exercise (no tap) is a neutral signal and changes nothing.
+    const outcomes = workoutExercises.map((e) => ({
+      exerciseId: e.id,
+      type: e.type,
+      difficulty: ratings[e.id],
+      completed: true,
+    }));
+    await recordOutcomes(outcomes);
+
+    // Reflect the just-earned progression on upcoming days right away (local,
+    // offline, deterministic — never re-calls the AI; leaves AI-authored days).
+    const seasonNow = await getSeason();
+    await applyProgressionToFuturePlan(profile, seasonNow, lang);
 
     // medals unlocked with this workout
     const weightLog = await getWeightLog();

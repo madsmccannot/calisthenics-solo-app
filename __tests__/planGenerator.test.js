@@ -10,9 +10,9 @@ import {
   diagnoseWorkout,
   FOCUS_ROTATION,
   LOAD,
-  scale,
 } from '../src/domain/planGenerator';
 import { validateWorkout, SCHEMA_VERSION } from '../src/domain/planSchema';
+import { BOUNDS } from '../src/domain/progression';
 import {
   EXERCISES,
   EXERCISE_IDS,
@@ -37,8 +37,10 @@ describe('exercise catalogue integrity', () => {
     expect(new Set(EXERCISE_IDS).size).toBe(EXERCISE_IDS.length);
   });
 
-  test('catalogue matches the AI prompt allow-list', () => {
-    expect([...EXERCISE_IDS].sort()).toEqual([...PROMPT_IDS].sort());
+  test('AI prompt allow-list is a subset of the catalogue', () => {
+    // The catalogue may hold local-only exercises the AI prompt does not list
+    // (the prompt sync is an API-path concern). Every prompt id must still exist.
+    for (const id of PROMPT_IDS) expect(EXERCISE_IDS).toContain(id);
   });
 
   test('every animation file is one that ships in assets', () => {
@@ -130,17 +132,35 @@ describe('hard constraints', () => {
   });
 });
 
-describe('season scaling is bounded and monotonic', () => {
-  test('scale() never decreases and respects the cap', () => {
-    expect(scale(10, 1, 50)).toBe(10);
-    expect(scale(10, 2, 50)).toBeGreaterThanOrEqual(scale(10, 1, 50));
-    expect(scale(10, 3, 50)).toBeGreaterThanOrEqual(scale(10, 2, 50));
-    expect(scale(100, 5, 50)).toBe(50); // capped
+describe('season no longer inflates difficulty (Phase 4)', () => {
+  test('a late season does not push quantities above the progression bounds', () => {
+    const w = buildWorkout({ level: 'Avançado' }, 1, 10, 'en');
+    for (const ex of w.exercises) {
+      const [lo, hi] = ex.type === 'time' ? BOUNDS.time : BOUNDS.reps;
+      expect(ex.quantity).toBeGreaterThanOrEqual(lo);
+      expect(ex.quantity).toBeLessThanOrEqual(hi);
+      expect(ex.rest_seconds).toBeGreaterThanOrEqual(8);
+    }
   });
 
-  test('later seasons never drop rest below the floor', () => {
-    const w = buildWorkout({ level: 'Avançado' }, 1, 10, 'en');
-    for (const ex of w.exercises) expect(ex.rest_seconds).toBeGreaterThanOrEqual(8);
+  test('with no progression, difficulty is the class base regardless of season', () => {
+    // Same seed inputs -> identical selection; season only seeds variety, not load.
+    const a = buildWorkout({ level: 'Iniciante' }, 1, 1, 'en');
+    const b = buildWorkout({ level: 'Iniciante' }, 1, 1, 'en', null, {});
+    expect(a.exercises.map((e) => e.quantity)).toEqual(b.exercises.map((e) => e.quantity));
+  });
+});
+
+describe('progression is consumed per exercise (Phase 4, step 3)', () => {
+  test('an earned offset raises only that exercise prescription', () => {
+    const base = buildWorkout({ level: 'Avançado' }, 1, 1, 'en');
+    const id = base.exercises[0].id;
+    const boosted = buildWorkout({ level: 'Avançado' }, 1, 1, 'en', null, { [id]: { offset: 8 } });
+    // selection is identical (progression does not affect selection), so the
+    // same exercise sits at index 0 and only its quantity changes.
+    expect(boosted.exercises[0].id).toBe(id);
+    expect(boosted.exercises[0].quantity).toBeGreaterThan(base.exercises[0].quantity);
+    expect(boosted.exercises[1].quantity).toBe(base.exercises[1].quantity); // untouched
   });
 });
 
@@ -201,12 +221,14 @@ describe('Phase 3 — layered engine', () => {
       expect(ids).not.toContain('burpee');
       for (const p of picks) expect(p.exercise.tier).toBeLessThanOrEqual(LEVEL_TIER['Avançado']);
     });
-    test('prescribe produces bounded numbers for reps and holds', () => {
+    test('prescribe produces bounded numbers and applies the earned offset', () => {
       const rng = () => 0.5;
-      const reps = prescribe({ type: 'reps' }, LOAD.Iniciante, 1, rng);
-      expect(reps.quantity).toBeGreaterThan(0);
-      expect(reps.rest_seconds).toBeGreaterThanOrEqual(8);
-      const hold = prescribe({ type: 'time' }, LOAD.Iniciante, 1, rng);
+      const flat = prescribe({ type: 'reps' }, LOAD.Iniciante, rng, { offset: 0 });
+      expect(flat.quantity).toBeGreaterThan(0);
+      expect(flat.rest_seconds).toBeGreaterThanOrEqual(8);
+      const boosted = prescribe({ type: 'reps' }, LOAD.Iniciante, rng, { offset: 5 });
+      expect(boosted.quantity).toBe(flat.quantity + 5);
+      const hold = prescribe({ type: 'time' }, LOAD.Iniciante, rng, undefined);
       expect(hold.quantity).toBeGreaterThan(0);
     });
   });
@@ -236,5 +258,39 @@ describe('Phase 3 — layered engine', () => {
     test('a normal profile diagnoses ok', () => {
       expect(diagnoseWorkout({ level: 'Iniciante' }).ok).toBe(true);
     });
+  });
+});
+
+describe('variant swap (Phase 4b)', () => {
+  const { resolveVariant } = require('../src/domain/planGenerator');
+  const { OFFSET } = require('../src/domain/progression');
+  const { getExercise } = require('../src/domain/exercises');
+
+  const ceil = { offset: OFFSET.reps[1] };
+  const floor = { offset: OFFSET.reps[0] };
+
+  test('at the ceiling, an advanced user moves to the harder variant', () => {
+    const e = resolveVariant(getExercise('pushup_classic'), ceil, { level: 'Avançado', used: new Set() });
+    expect(e.id).toBe('pushup_wide'); // pushup_classic.progression
+  });
+
+  test('at the floor, the user drops to the easier variant', () => {
+    const e = resolveVariant(getExercise('pushup_wide'), floor, { level: 'Avançado', used: new Set() });
+    expect(e.id).toBe('pushup_classic'); // pushup_wide.regression
+  });
+
+  test('the class tier ceiling still blocks an over-tier upshift', () => {
+    // plank.progression = side_plank (tier 2) — a beginner (tier 1) must not get it
+    const e = resolveVariant(getExercise('plank'), { offset: OFFSET.time[1] }, { level: 'Iniciante', used: new Set() });
+    expect(e.id).toBe('plank');
+  });
+
+  test('an excluded or already-used variant is not swapped in', () => {
+    expect(resolveVariant(getExercise('pushup_classic'), ceil, { level: 'Avançado', exclude: ['pushup_wide'], used: new Set() }).id).toBe('pushup_classic');
+    expect(resolveVariant(getExercise('pushup_classic'), ceil, { level: 'Avançado', used: new Set(['pushup_wide']) }).id).toBe('pushup_classic');
+  });
+
+  test('no earned progression leaves the exercise unchanged', () => {
+    expect(resolveVariant(getExercise('pushup_classic'), undefined, { level: 'Avançado', used: new Set() }).id).toBe('pushup_classic');
   });
 });
