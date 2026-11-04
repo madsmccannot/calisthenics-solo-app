@@ -91,7 +91,22 @@
   (DEVELOPMENT_RULES §6 — an input needs a real purpose): equipment (catalogue is
   all bodyweight) and goal (no agreed goal→programming mapping). Session length
   and exclusions apply to future days on regenerate; days-per-week applies at the
-  next season. Suite now 134 tests / 9 suites.
+  next season.
+- Integration coherence fixes (from a full-repo review):
+  - **Profile prefs now sync.** `daysPerWeek`/`sessionMinutes`/`exclude` are
+    pushed and pulled via a `prefs` jsonb on `profiles` (schema migration), so
+    personalization survives login on another device. Was silently dropped.
+  - **Save/Apply flow fixed.** The "apply changes" prompt now compares the
+    edited settings against what the PLAN was generated with (`planPrefs` /
+    `planClass`), not the saved profile — so pressing Save no longer makes the
+    regenerate button vanish before the plan is actually rebuilt.
+  - **AI subordinated to the engine.** The Gemini path now honours the same
+    personalization (exclusions + session length in the prompt) and no longer
+    scales difficulty by season; AI output is tagged `source: 'ai'` and
+    **validated against the catalogue/schema — invalid days fall back to the
+    deterministic generator** instead of just logging a warning.
+  - New tests: AI validate+fallback (`aiValidation.test.js`), profile-prefs push
+    (`cloudSync.test.js`). Suite now 137 tests / 10 suites.
 - Phase 3 — Deterministic Training Programming Engine completed to spec. The
   generator (`src/domain/planGenerator.js`) is now layered by responsibility:
   `normalizeProfile` (validate explicit inputs into constraints, with safe

@@ -126,3 +126,7 @@ create unique index if not exists weight_log_user_date_unique on weight_log (use
 alter table progress add column if not exists rewarded_workouts jsonb default '{}'::jsonb;
 -- Phase 4: per-exercise earned progression ({ exerciseId: { offset, ... } }).
 alter table progress add column if not exists progression jsonb default '{}'::jsonb;
+-- Personalization: profile preferences that drive plan generation
+-- ({ daysPerWeek, sessionMinutes, exclude }). Kept as one jsonb so new prefs
+-- don't each need a column + migration.
+alter table profiles add column if not exists prefs jsonb default '{}'::jsonb;

@@ -245,6 +245,12 @@ export async function pushSnapshot() {
       upd.weight = num(d.profile.weight);
       upd.height = num(d.profile.height);
       upd.class = d.profile.level || 'Iniciante';
+      // personalization prefs that drive plan generation
+      upd.prefs = {
+        daysPerWeek: d.profile.daysPerWeek ?? null,
+        sessionMinutes: d.profile.sessionMinutes ?? null,
+        exclude: Array.isArray(d.profile.exclude) ? d.profile.exclude : [],
+      };
     }
     if (d.displayName) upd.display_name = d.displayName;
     await run('profiles', supabase.from('profiles').update(upd).eq('id', uid));
@@ -337,10 +343,14 @@ export async function pullSnapshot() {
       ));
     }
     if (prof.data && (prof.data.weight != null || prof.data.height != null)) {
+      const prefs = prof.data.prefs || {};
       await AsyncStorage.setItem(K.profile, JSON.stringify({
         weight: prof.data.weight != null ? String(prof.data.weight) : '',
         height: prof.data.height != null ? String(prof.data.height) : '',
         level: prof.data.class || 'Iniciante',
+        daysPerWeek: prefs.daysPerWeek ?? undefined,
+        sessionMinutes: prefs.sessionMinutes ?? null,
+        exclude: Array.isArray(prefs.exclude) ? prefs.exclude : [],
       }));
     }
     if (prof.data?.display_name) {

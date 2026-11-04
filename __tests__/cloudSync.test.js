@@ -181,3 +181,17 @@ describe('mergeGameState — explicit conflict reconciliation (Phase 5)', () => 
     expect(mergeGameState(local, remote).feedEvents).toEqual([{ id: 'f1' }]);
   });
 });
+
+describe('profile personalization prefs sync (Phase 5 / #1 fix)', () => {
+  test('pushSnapshot sends daysPerWeek / sessionMinutes / exclude as prefs', async () => {
+    await AsyncStorage.setItem('userProfile', JSON.stringify({
+      weight: '80', height: '180', level: 'Avançado',
+      daysPerWeek: 4, sessionMinutes: 30, exclude: ['burpee'],
+    }));
+    await pushSnapshot();
+    const prof = tableRecs('profiles')[0];
+    const update = prof.ops.find((o) => o[0] === 'update')[1][0];
+    expect(update.class).toBe('Avançado');
+    expect(update.prefs).toEqual({ daysPerWeek: 4, sessionMinutes: 30, exclude: ['burpee'] });
+  });
+});

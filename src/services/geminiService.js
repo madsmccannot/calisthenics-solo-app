@@ -1,4 +1,5 @@
 import { supabase, supabaseEnabled } from './supabase';
+import { normalizeProfile } from '../domain/planGenerator';
 
 // SECURITY: the Gemini API key is a billable secret and must NOT ship in the
 // client bundle. Production calls go through a Supabase Edge Function proxy
@@ -115,25 +116,29 @@ export async function generateWorkoutPlan(profile, dayNumber = 1, season = 1, la
   const guidance = LEVEL_GUIDANCE[profile.level] || LEVEL_GUIDANCE.Iniciante;
   const today = DAILY_FOCUS[(dayNumber - 1) % DAILY_FOCUS.length];
   const langName = LANG_NAMES[lang] || 'English';
-  const seasonRule =
-    season > 1
-      ? `\nTHIS IS SEASON ${season}: increase difficulty vs earlier seasons — more reps (about +${(season - 1) * 15}%), harder variations and slightly shorter rests, WITHOUT breaking the level's load rule.`
-      : '';
+  // Honour the same personalization the deterministic engine does, so the two
+  // generation paths produce comparable plans. Difficulty is NOT scaled by the
+  // season anymore — progression is earned per exercise by the local engine.
+  const norm = normalizeProfile(profile);
+  const count = norm.fixedCount ? `exactly ${norm.fixedCount}` : '5 to 7';
+  const excludeRule = norm.exclude.length
+    ? `\nEXCLUDED (mandatory): never use these exercise ids: ${norm.exclude.join(', ')}.`
+    : '';
   const userPrompt = `
 Generate the workout for Day ${dayNumber} with this data:
 - Weight: ${profile.weight}kg
 - Height: ${profile.height}cm
 - Level: ${profile.level}
-- Season: ${season} · Plan day: ${dayNumber} of 30
+- Plan day: ${dayNumber} of 30
 
 LANGUAGE (mandatory): write every "display_name" in ${langName}. Keep the "id" values exactly as listed.
 
 FOCUS OF THIS DAY (mandatory): ${today.focus}
-Use "workout_type": "${today.type}".${seasonRule}
+Use "workout_type": "${today.type}".${excludeRule}
 
 VARIETY (mandatory): pick exercises that fit this focus and VARY from other days.
 Do NOT always repeat the same sequence or rep counts. Vary the order, the chosen
-exercises and the quantities. Include 5 to 7 exercises.
+exercises and the quantities. Include ${count} exercises.
 
 LOAD RULE (mandatory, tune the "quantity" and "rest_seconds" fields to this):
 ${guidance}

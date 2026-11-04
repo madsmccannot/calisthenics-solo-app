@@ -11,7 +11,7 @@ import LockerModal from '../components/LockerModal';
 import LanguagePicker from '../components/LanguagePicker';
 import { colors, radius } from '../theme';
 import { useI18n } from '../i18n/I18nContext';
-import { getRegenerableCount, regenerateFuturePlan, getPlanClass } from '../services/planService';
+import { getRegenerableCount, regenerateFuturePlan, getPlanClass, getPlanPrefs } from '../services/planService';
 import { PROFILE_OPTIONS } from '../domain/planGenerator';
 import { EXERCISES, exerciseName } from '../domain/exercises';
 import { getProgressSummary, getAvatar } from '../services/progressStore';
@@ -52,6 +52,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [planClass, setPlanClass] = useState(null);
+  const [planPrefs, setPlanPrefs] = useState(null);
   const [regenCount, setRegenCount] = useState(0);
   const [info, setInfo] = useState(null);
 
@@ -67,6 +68,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
 
   const loadAll = async () => {
     setPlanClass(await getPlanClass());
+    setPlanPrefs(await getPlanPrefs());
     setRegenCount(await getRegenerableCount());
     setAvatar(await getAvatar());
     setSummary(await getProgressSummary());
@@ -75,9 +77,12 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
   };
 
   const sameSet = (a = [], b = []) => a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
+  // Compare against what the PLAN was generated with (planPrefs/planClass), not
+  // the saved profile — otherwise Save would clear the prompt before the plan is
+  // actually regenerated.
   const settingsDiffer =
-    (sessionMinutes ?? null) !== (profile?.sessionMinutes ?? null) ||
-    !sameSet(exclude, Array.isArray(profile?.exclude) ? profile.exclude : []);
+    (sessionMinutes ?? null) !== (planPrefs?.sessionMinutes ?? null) ||
+    !sameSet(exclude, Array.isArray(planPrefs?.exclude) ? planPrefs.exclude : []);
   // Session length and exclusions take effect by regenerating future days;
   // daysPerWeek only reshapes the schedule at the next season, so it does not
   // drive this prompt.
@@ -111,6 +116,7 @@ export default function ProfileScreen({ profile, onProfileUpdate, onReset, onPla
     onProfileUpdate(updated);
     const { changed } = await regenerateFuturePlan(updated, lang);
     setPlanClass(level);
+    setPlanPrefs(await getPlanPrefs());
     setRegenCount(await getRegenerableCount());
     setRegenerating(false);
     onPlanChanged?.();
